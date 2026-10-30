@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3352C4">
+<title>Aportes Parroquiales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap">
+<style>
+/* Diseño: app de una columna tipo celular, tarjetas redondeadas, barra de pestañas abajo para tesoreros y guía */
+:root{
+  --bg:#F4F5FA; --surface:#FFFFFF; --ink:#1C2233; --muted:#646C80; --line:#E3E6EF;
+  --brand:#3352C4; --brand-ink:#FFFFFF; --brand-soft:#E6EBFB; --brand-deep:#23398F;
+  --sun:#F2B33D; --sun-soft:#FDF1D8;
+  --ok:#1E8A55; --ok-soft:#DDF3E7; --warn:#B26A00; --warn-soft:#FCEBCF; --bad:#C23B3B; --bad-soft:#FBE3E3;
+  --shadow:0 1px 2px rgba(28,34,51,.05),0 6px 18px rgba(28,34,51,.06);
+  --font:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#10131C; --surface:#191E2B; --ink:#E9ECF4; --muted:#A0A8BB; --line:#2A3142;
+  --brand:#7D96F0; --brand-ink:#0E1430; --brand-soft:#232D4F; --brand-deep:#5672D9;
+  --sun:#F2B33D; --sun-soft:#3A2F17;
+  --ok:#5CC98F; --ok-soft:#163626; --warn:#EDAA4E; --warn-soft:#3A2A12; --bad:#EE8080; --bad-soft:#3D1E1E;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark}}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:600px;margin:0 auto;padding-block:12px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.sm{width:16px;height:16px}
+
+/* Encabezado */
+.head{display:flex;align-items:center;gap:12px;padding:4px 0}
+.avatar{width:44px;height:44px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-weight:900;flex:none}
+.avatar.sm{width:36px;height:36px;font-size:.85rem}
+.avatar.sun{background:var(--sun);color:#3A2A05}
+.head .who{flex:1;min-width:0}
+.head .who b{display:block;font-size:1.15rem;font-weight:800;line-height:1.2}
+.head .who span{font-size:.85rem;color:var(--muted)}
+.iconbtn{border:0;background:var(--surface);box-shadow:var(--shadow);width:42px;height:42px;border-radius:12px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+
+/* Tarjetas */
+.card{background:var(--surface);border-radius:18px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{margin:0;font-size:1.08rem;font-weight:800;display:flex;align-items:center;gap:8px}
+.card h2 .ico{color:var(--brand)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.muted{color:var(--muted)} .small{font-size:.87rem} .tiny{font-size:.78rem}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.debt{color:var(--bad);font-weight:800} .paid{color:var(--ok);font-weight:800}
+
+/* Tarjeta principal */
+.hero{background:linear-gradient(140deg,var(--brand) 0%,var(--brand-deep) 100%);color:#fff;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 24px rgba(51,82,196,.25)}
+@media (prefers-color-scheme: dark){.hero{color:#fff;background:linear-gradient(140deg,#3352C4,#23398F)}}
+.hero .lbl{font-size:.9rem;opacity:.85;font-weight:600}
+.hero .big{font-size:2.6rem;font-weight:900;line-height:1;letter-spacing:-.02em}
+.hero .chip{align-self:flex-start;background:rgba(255,255,255,.18);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.88rem;display:flex;gap:6px;align-items:center}
+.hero .chip.ok{background:#E6F7EE;color:#14663F} .hero .chip.bad{background:#FFE7E7;color:#9C2727}
+.hero .btn{background:#fff;color:#23398F}
+
+/* Botones */
+.btn{border:0;border-radius:14px;padding:13px 16px;font-weight:800;font-size:1rem;cursor:pointer;background:var(--brand);color:var(--brand-ink);display:inline-flex;gap:8px;align-items:center;justify-content:center;text-decoration:none;min-height:48px}
+.btn.block{width:100%}
+.btn.soft{background:var(--brand-soft);color:var(--brand)}
+.btn.ok{background:var(--ok);color:#fff}
+.btn.wa{background:#25A35A;color:#fff}
+.btn.bad{background:var(--bad-soft);color:var(--bad)}
+.btn.ghost{background:transparent;color:var(--brand);padding:8px 10px;min-height:0}
+.btn.sm{padding:9px 12px;min-height:40px;font-size:.92rem;border-radius:12px}
+.btn[disabled]{opacity:.55;cursor:wait}
+.btn:focus-visible,.iconbtn:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,.mem:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions .btn{flex:1 1 auto}
+
+/* Formularios */
+label{display:flex;flex-direction:column;gap:6px;font-size:.88rem;color:var(--muted);font-weight:700}
+input,select{background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px;width:100%;font-size:1rem;color:var(--ink)}
+input:focus,select:focus{border-color:var(--brand);outline:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:440px){.grid2{grid-template-columns:1fr}}
+.file{border:2px dashed var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);cursor:pointer;text-align:center}
+.file.has{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.file input{display:none}
+.err{color:var(--bad);font-weight:700;font-size:.92rem}
+
+/* Listas */
+.list{display:flex;flex-direction:column}
+.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.list>.item:first-child,.list>.mem-wrap:first-child{border-top:0}
+.item .l{flex:1;min-width:0}
+.item .t{font-weight:800}
+.ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--brand-soft);color:var(--brand)}
+.ic.sun{background:var(--sun-soft);color:var(--warn)} .ic.ok{background:var(--ok-soft);color:var(--ok)} .ic.bad{background:var(--bad-soft);color:var(--bad)}
+.pill{font-size:.75rem;font-weight:800;padding:4px 9px;border-radius:999px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.neutral{background:var(--brand-soft);color:var(--brand)}
+.pill.off{background:var(--line);color:var(--muted)}
+.mem-wrap{border-top:1px solid var(--line)}
+.mem{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;text-align:left;cursor:pointer;padding:12px 0;color:inherit}
+.mem .chev{color:var(--muted);transition:transform .2s}
+.mem[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.det{display:flex;flex-direction:column;gap:12px;padding:4px 0 18px}
+.det h3{font-size:.95rem;font-weight:800;margin:6px 0 0}
+.search{position:relative}
+.search .ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.search input{padding-left:40px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.85rem;cursor:pointer;color:var(--muted)}
+.filters button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+
+/* Cuotas */
+.cuotas{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cuota{border-radius:12px;padding:8px 4px;text-align:center;background:var(--bg);border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase}
+.cuota .ico{width:16px;height:16px}
+.cuota.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.cuota.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.estado{border-radius:14px;padding:12px 14px;font-weight:800;display:flex;gap:10px;align-items:center}
+.estado.ok{background:var(--ok-soft);color:var(--ok)} .estado.bad{background:var(--bad-soft);color:var(--bad)} .estado.neutral{background:var(--brand-soft);color:var(--brand)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:440px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}}
+.stat{background:var(--bg);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font-size:1.1rem;font-weight:900;font-variant-numeric:tabular-nums}
+.prog{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.prog span{display:block;height:100%;background:var(--ok);border-radius:99px}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--surface);border-radius:18px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-size:1.45rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .k{font-size:.85rem;color:var(--muted);font-weight:700}
+.tablewrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:.9rem}
+table.t th{text-align:left;color:var(--muted);font-weight:700;font-size:.78rem;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td{padding:10px 8px;border-bottom:1px solid var(--line)}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Pestañas abajo */
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:15}
+.tabs .in{display:flex;max-width:600px;width:100%}
+.tab{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;font-weight:800;color:var(--muted);cursor:pointer;border-radius:12px;position:relative}
+.tab[aria-current="page"]{color:var(--brand);background:var(--brand-soft)}
+.tab .badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:999px;font-size:.65rem;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px}
+
+/* Hoja inferior (formularios) */
+.sheet-bg{position:fixed;inset:0;background:rgba(16,19,28,.45);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:600px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:20px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet .grab{width:44px;height:5px;border-radius:99px;background:var(--line);align-self:center}
+.sheet h2{margin:0;font-size:1.2rem;font-weight:900}
+.receipt{background:var(--bg);border-radius:14px;padding:14px;font-size:.9rem;white-space:pre-wrap;font-family:inherit}
+.check{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-weight:700;color:var(--ink);flex-direction:row;font-size:1rem}
+.check input{width:22px;height:22px;flex:none;accent-color:var(--brand)}
+.check:first-child{border-top:0}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:700;font-size:.92rem;max-width:90vw;z-index:40;box-shadow:var(--shadow)}
+.login{min-height:70vh;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.login .logo{width:64px;height:64px;border-radius:20px;background:var(--brand);color:#fff;display:grid;place-items:center}
+.login .logo .ico{width:32px;height:32px}
+.login h1{font-size:1.8rem;font-weight:900;margin:0;line-height:1.15;text-wrap:balance}
+.empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;color:var(--muted);text-align:center}
+.empty .ic{width:48px;height:48px;border-radius:16px}
+.sec-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:6px 4px -4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <section id="vCargando"><div class="card"><div class="muted">Cargando…</div></div></section>
+
+  <section id="vLogin" class="login" hidden>
+    <div class="logo"><svg class="ico"><use href="#i-heart"/></svg></div>
+    <h1>Aportes de la parroquia</h1>
+    <div class="muted">Entrá con el código personal que te pasó tu tesorero. Si abriste tu link, entrás directo.</div>
+    <div class="card">
+      <label>Tu código<input id="inCodigo" autocomplete="off" autocapitalize="characters" placeholder="Ej.: AB3K-7QPZ"></label>
+      <button class="btn block" id="btnEntrar">Entrar</button>
+      <div class="err" id="loginErr" hidden></div>
+    </div>
+  </section>
+
+  <div id="vMain" hidden></div>
+</div>
+<nav class="tabs" id="tabs" hidden><div class="in" id="tabsIn"></div></nav>
+<div class="toast" id="toast" hidden></div>
+<div id="sheetRoot"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M18.5 4.5l2 2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+</svg>
+
+<script>
+// ===== Conexión =====
+const SUPABASE_URL = "https://hrqoghervpbwjbeclbwz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_jOVgmqIM8XINypWnhVaBOA_JofJPGoR";
+
+// ===== Utilidades =====
+const $ = id => document.getElementById(id);
+const fmt = n => "$ " + Math.round(Number(n)||0).toLocaleString("es-AR");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const I = (n, cls="") => `<svg class="ico ${cls}"><use href="#i-${n}"/></svg>`;
+const ini = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+const primer = n => String(n||"").trim().split(" ")[0];
+const plural = (n,c) => `${n} ${n===1?c.unidad:c.unidad_plural}`;
+function telWA(t){
+  let d = String(t||"").replace(/\D/g,"");
+  if(!d) return "";
+  if(d.startsWith("0")) d = d.slice(1);
+  if(d.length===10) d = "549"+d;                 // 381 5550101 -> 549 381 5550101
+  else if(d.startsWith("54") && !d.startsWith("549")) d = "549"+d.slice(2);
+  return d;
+}
+const waLink = (tel, txt) => `https://wa.me/${telWA(tel)}?text=${encodeURIComponent(txt)}`;
+const linkPersonal = cod => location.origin + location.pathname + "?c=" + encodeURIComponent(cod);
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MES_N = {enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+
+let tt; function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tt);tt=setTimeout(()=>el.hidden=true,3200)}
+function store(k,v){try{ v===null?localStorage.removeItem(k):localStorage.setItem(k,v) }catch(_){}}
+function read(k){try{return localStorage.getItem(k)}catch(_){return null}}
+async function ocupado(btn, fn){ if(btn) btn.disabled=true; try{ return await fn() } finally { if(btn) btn.disabled=false } }
+
+async function rpc(fn, args){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method:"POST", headers:{ "apikey":SUPABASE_KEY, "Content-Type":"application/json" }, body: JSON.stringify(args)
+  });
+  const j = await r.json().catch(()=>null);
+  if(!r.ok) throw new Error(j?.message || "No se pudo conectar. Revisá tu internet y probá de nuevo.");
+  return j;
+}
+async function fnComprobantes(body){
+  const isForm = body instanceof FormData;
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/comprobantes`, {
+    method:"POST",
+    headers: isForm ? { "apikey":SUPABASE_KEY } : { "apikey":SUPABASE_KEY, "Content-Type":"application/json" },
+    body: isForm ? body : JSON.stringify(body)
+  });
+  const j = await r.json().catch(()=>null);
+  if(!r.ok) throw new Error(j?.error || "No se pudo conectar. Probá de nuevo.");
+  return j;
+}
+// Achica las fotos antes de subirlas (ahorra espacio y datos)
+async function comprimir(file){
+  if(!file.type.startsWith("image/") || /heic|heif/i.test(file.type)) return file;
+  try{
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(res => c.toBlob(res, "image/jpeg", 0.72));
+    if(!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", {type:"image/jpeg"});
+  }catch(_){ return file; }
+}
+
+// ===== Hoja inferior =====
+function abrirHoja(html, onMount){
+  const bg = document.createElement("div"); bg.className = "sheet-bg";
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  const cerrar = () => { bg.remove(); document.body.style.overflow = ""; };
+  bg.addEventListener("click", e => { if(e.target===bg || e.target.closest("[data-cerrar]")) cerrar(); });
+  $("sheetRoot").appendChild(bg); document.body.style.overflow = "hidden";
+  onMount && onMount(bg.querySelector(".sheet"), cerrar);
+  const f = bg.querySelector("input,select"); if(f) setTimeout(()=>f.focus(), 50);
+  return cerrar;
+}
+function confirmar(titulo, texto, boton, cls="bad"){
+  return new Promise(res=>{
+    abrirHoja(`<h2>${esc(titulo)}</h2><div class="muted">${texto}</div>
+      <div class="actions"><button class="btn soft" data-no>Cancelar</button><button class="btn ${cls}" data-si>${esc(boton)}</button></div>`,
+      (s, cerrar)=>{ s.querySelector("[data-no]").onclick=()=>{cerrar();res(false)}; s.querySelector("[data-si]").onclick=()=>{cerrar();res(true)}; });
+  });
+}
+
+// ===== Estado =====
+const S = { codigo:null, data:null, panel:null, caja:null, mails:false, gastos:null, token:null, tab:"inicio", filtro:"todos", busca:"", sub:"tesoreros" };
+
+async function entrar(cod){
+  mostrar("vCargando");
+  try{
+    S.data = await rpc("entrar", {p_codigo: cod});
+    S.codigo = cod.trim().toUpperCase();
+    store("aportes_codigo", S.codigo);
+    await cargarExtras();
+    S.tab = read("aportes_tab_"+S.data.tipo) || "inicio";
+    render();
+  }catch(e){
+    store("aportes_codigo", null);
+    mostrar("vLogin"); $("loginErr").textContent = e.message; $("loginErr").hidden = false;
+  }
+}
+async function recargar(){
+  S.data = await rpc("entrar", {p_codigo:S.codigo});
+  await cargarExtras();
+  render();
+}
+async function cargarExtras(){
+  if(S.data.tipo==="miembro") return;
+  const tareas = [rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>S.gastos=r).catch(()=>S.gastos=[])];
+  if(S.data.tipo==="guia"){
+    tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
+    tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
+    tareas.push(rpc("guia_mails_estado",{p_codigo:S.codigo}).then(r=>S.mails=!!r).catch(()=>S.mails=false));
+  }
+  await Promise.all(tareas);
+}
+function mostrar(id){
+  for(const v of ["vCargando","vLogin","vMain"]) $(v).hidden = v!==id;
+  $("tabs").hidden = !(id==="vMain" && S.data && S.data.tipo!=="miembro");
+}
+function salir(){
+  store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null;
+  history.replaceState(null,"",location.pathname); $("inCodigo").value=""; $("loginErr").hidden=true; mostrar("vLogin");
+}
+
+function cabecera(nombre, sub, sun){
+  return `<div class="head"><div class="avatar ${sun?"sun":""}">${esc(ini(nombre))}</div>
+    <div class="who"><b>Hola, ${esc(primer(nombre))}</b><span>${esc(sub)}</span></div>
+    <button class="iconbtn" data-salir aria-label="Salir">${I("logout")}</button></div>`;
+}
+
+function render(){
+  mostrar("vMain");
+  const m = $("vMain");
+  if(S.data.tipo==="miembro"){ m.innerHTML = vistaMiembro(); montarMiembro(); return; }
+  const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"],["gastos","Gastos","receipt"]];
+  if(S.data.tipo==="guia") tabs.push(["gestion","Gestión","sliders"],["reportes","Reportes","chart"]);
+  if(!tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
+  const pend = S.data.pendientes.length;
+  $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""}>${I(ic)}<span>${t}</span>${id==="inicio"&&pend?`<span class="badge">${pend}</span>`:""}</button>`).join("");
+  const t = S.data.tesorero;
+  const sub = S.data.tipo==="guia" ? `Guía del área · ${S.data.parroquia}` : `Tesorero · ${S.data.miembros.length} dirigentes a cargo`;
+  let body = "";
+  if(S.tab==="inicio") body = tabInicio();
+  if(S.tab==="dirigentes") body = tabDirigentes();
+  if(S.tab==="cobrar") body = tabCobrar();
+  if(S.tab==="gestion") body = tabGestion();
+  if(S.tab==="reportes") body = tabReportes();
+  if(S.tab==="gastos") body = tabGastos();
+  m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
+  montarTesorero(); montarExtras();
+}
+$("tabsIn").onclick = e => { const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+S.data.tipo, S.tab); render(); scrollTo({top:0}); };
+
+// ===== Aporte anual =====
+function estadoAporte(a){
+  if(a.meses_vencidos===0) return {cls:"neutral", ic:"clock", txt:`Las cuotas empiezan en ${a.mes_desde}.`};
+  if(a.falta_anio<=0) return {cls:"ok", ic:"award", txt:"¡Año cancelado! Gracias."};
+  if(a.al_dia) return {cls:"ok", ic:"check", txt: a.adelantado>0 ? `Al día a ${a.mes_actual}, con ${fmt(a.adelantado)} adelantado.` : `Al día a ${a.mes_actual}.`};
+  return {cls:"bad", ic:"alert", txt:`Debe ${a.cuotas_atrasadas} ${a.cuotas_atrasadas===1?"cuota":"cuotas"} (${fmt(a.atraso)}) a ${a.mes_actual}.`};
+}
+function aporteHTML(a, propio){
+  const n = a.meses_total, inicio = MES_N[a.mes_desde] || 3;
+  let cel = "";
+  for(let i=0;i<n;i++){
+    const cls = i < a.cuotas_pagas ? "ok" : (i < a.meses_vencidos ? "bad" : "");
+    cel += `<div class="cuota ${cls}">${cls==="ok"?I("check"):cls==="bad"?I("x"):I("clock")}${MESES[(inicio-1+i)%12]}</div>`;
+  }
+  const e = estadoAporte(a);
+  let txt = e.txt; if(propio && e.cls==="bad") txt = txt.replace(/^Debe/,"Debés");
+  return `
+    <div class="estado ${e.cls}">${I(e.ic)}<span>${esc(txt)}</span></div>
+    <div class="cuotas">${cel}</div>
+    <div class="stats">
+      <div class="stat"><span class="muted tiny">Compromiso del año</span><b>${fmt(a.anual)}</b></div>
+      <div class="stat"><span class="muted tiny">Pagado${a.en_revision>0?` · ${fmt(a.en_revision)} en revisión`:""}</span><b class="paid">${fmt(a.pagado)}</b></div>
+      <div class="stat"><span class="muted tiny">Falta para cancelar el año</span><b class="${a.falta_anio>0?"debt":"paid"}">${a.falta_anio>0?fmt(a.falta_anio):"Nada"}</b></div>
+    </div>
+    ${a.meses_vencidos>0?`<div class="muted small">A ${a.mes_actual} ${propio?"deberías":"debería"} llevar ${fmt(a.debido_a_hoy)} (${a.meses_vencidos} de ${n} cuotas de ${fmt(a.mensual)}). Las cuotas van de ${a.mes_desde} a ${a.mes_hasta}.</div>`:""}`;
+}
+function icConcepto(nombre){
+  const n = nombre.toLowerCase();
+  if(n.startsWith("aporte")) return ["heart",""];
+  return ["gift","sun"];
+}
+function conceptosHTML(cs){
+  return cs.map(r=>{ const [ic,c]=icConcepto(r.nombre); return `
+    <div class="item"><div class="ic ${c}">${I(ic)}</div><div class="l"><div class="t">${esc(r.nombre)}</div>
+      <div class="muted small">${r.evento_id===null?`${r.cantidad} cuotas vencidas`:`${plural(r.cantidad,r)} × ${fmt(r.precio)}`} · pagado ${fmt(r.pagado)}${r.pendiente>0?` · ${fmt(r.pendiente)} en revisión`:""}</div></div>
+      <div class="num ${r.saldo>0?"debt":"paid"}">${r.saldo>0?fmt(r.saldo):(r.a_favor>0?`+${fmt(r.a_favor)}`:I("check"))}</div></div>`}).join("");
+}
+function pillEstado(e){return e==="verificado"?`<span class="pill ok">${I("check","sm")}Verificado</span>`:e==="pendiente"?`<span class="pill warn">${I("clock","sm")}En revisión</span>`:`<span class="pill bad">${I("x","sm")}Rechazado</span>`}
+function pagosHTML(ps, reenviar){
+  return ps.length ? ps.map(p=>`
+    <div class="item"><div class="ic ${p.estado==="verificado"?"ok":p.estado==="pendiente"?"sun":"bad"}">${I(p.medio==="Efectivo"?"cash":"file")}</div>
+      <div class="l"><div class="t">${esc(p.concepto)}</div>
+      <div class="muted small">${p.fecha} · ${p.medio}${p.recibo_nro?` · Recibo ${p.recibo_nro}`:""}</div>
+      ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}</div>
+      <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end"><div class="num" style="font-weight:800">${fmt(p.monto)}</div>${pillEstado(p.estado)}</div></div>`).join("")
+    : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no hay pagos registrados.</div>`;
+}
+
+// ===== Vista del dirigente =====
+function vistaMiembro(){
+  const d = S.data, c = d.cuenta, m = c.miembro;
+  const chip = c.saldo<=0 ? `<span class="chip ok">${I("check","sm")} Estás al día</span>` : `<span class="chip">${I("clock","sm")} Saldo pendiente</span>`;
+  return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
+  <div class="hero">
+    <div class="lbl">Lo que debés hoy</div>
+    <div class="big num">${fmt(c.saldo)}</div>
+    ${chip}
+    ${c.pendiente>0?`<div class="small" style="opacity:.9">Tenés ${fmt(c.pendiente)} en comprobantes esperando que tu tesorero los verifique.</div>`:""}
+    <button class="btn block" data-pagar>${I("upload")} Informar un pago</button>
+  </div>
+  <div class="card"><h2>${I("heart")} Mi aporte anual</h2>${aporteHTML(c.aporte, true)}</div>
+  <div class="card"><h2>${I("tag")} Lo que debo por concepto</h2><div class="list">${conceptosHTML(c.conceptos)}</div></div>
+  <div class="card"><h2>${I("clock")} Mis pagos</h2><div class="list">${pagosHTML(c.pagos)}</div></div>
+  ${d.tesorero?`<div class="card"><div class="item" style="padding:0"><div class="avatar sm">${esc(ini(d.tesorero.nombre))}</div>
+    <div class="l"><div class="muted tiny">Tu tesorero</div><div class="t">${esc(d.tesorero.nombre)}</div></div>
+    <a class="btn wa sm" target="_blank" rel="noopener" href="${waLink(d.tesorero.celular, `Hola ${primer(d.tesorero.nombre)}, soy ${m.nombre}. `)}">${I("msg","sm")} Escribirle</a></div></div>`:""}`;
+}
+function montarMiembro(){
+  $("vMain").onclick = null; $("vMain").onchange = null;
+  $("vMain").querySelector("[data-salir]").onclick = salir;
+  $("vMain").querySelector("[data-pagar]").onclick = hojaPago;
+}
+function hojaPago(){
+  const ev = S.data.eventos;
+  abrirHoja(`<h2>Informar un pago por transferencia</h2>
+    <div class="muted small">Subí la foto o el PDF del comprobante. Tu tesorero lo revisa y te llega el recibo por mail. Si pagaste en efectivo, lo carga tu tesorero.</div>
+    <label>¿Qué estás pagando?<select id="pConcepto"><option value="">Aporte mensual</option>${ev.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
+    <label id="pCantBox" hidden>¿Cuántas unidades pagás?<input id="pCant" type="number" inputmode="numeric" min="1" value="1"></label>
+    <label>Monto que transferiste ($)<input id="pMonto" type="number" inputmode="numeric" min="1" placeholder="Ej.: ${Math.round(S.data.cuenta.miembro.aporte_mensual)||10000}"></label>
+    <label class="file" id="pFileBox">${I("upload")}<span id="pFileTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
+      <input id="pArchivo" type="file" accept="image/*,application/pdf"></label>
+    <div class="err" id="pErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="pEnviar">${I("send")} Enviar</button></div>`,
+  (s, cerrar)=>{
+    const selC = s.querySelector("#pConcepto"), cantBox = s.querySelector("#pCantBox"), cant = s.querySelector("#pCant"), montoI = s.querySelector("#pMonto");
+    const calc = ()=>{ const e = ev.find(x=>String(x.id)===selC.value); cantBox.hidden = !e;
+      if(e){ cantBox.firstChild.textContent = `¿Cuántas ${e.unidad_plural} pagás? (${fmt(e.precio)} c/u)`; montoI.value = Math.round((Number(cant.value)||0)*e.precio); } };
+    selC.onchange = ()=>{ if(!ev.find(x=>String(x.id)===selC.value)) montoI.value=""; calc(); }; cant.oninput = calc;
+    const inp = s.querySelector("#pArchivo");
+    inp.onchange = ()=>{ const f=inp.files[0]; s.querySelector("#pFileBox").classList.toggle("has",!!f); s.querySelector("#pFileTxt").innerHTML = f?`<b>${esc(f.name)}</b><br><span class="small">Tocá para cambiarlo</span>`:"<b>Tocá para elegir el comprobante</b>"; };
+    const btn = s.querySelector("#pEnviar"), err = s.querySelector("#pErr");
+    btn.onclick = () => ocupado(btn, async ()=>{
+      err.hidden = true;
+      try{
+        const monto = Number(s.querySelector("#pMonto").value); let f = inp.files[0];
+        if(!(monto>0)) throw new Error("Escribí el monto que transferiste.");
+        if(!f) throw new Error("Elegí la foto o el PDF del comprobante.");
+        btn.innerHTML = "Enviando…";
+        f = await comprimir(f);
+        if(f.size > 10*1024*1024) throw new Error("El archivo pesa más de 10 MB.");
+        const fd = new FormData(); fd.append("codigo",S.codigo); fd.append("monto",String(monto)); fd.append("evento_id", s.querySelector("#pConcepto").value); fd.append("archivo", f);
+        await fnComprobantes(fd);
+        cerrar(); await recargar(); toast("¡Listo! Tu tesorero va a revisar el comprobante.");
+      }catch(e){ err.textContent=e.message; err.hidden=false; btn.innerHTML=`${I("send")} Enviar`; }
+    });
+  });
+}
+
+// ===== Tesorero y guía: pestañas =====
+function tabInicio(){
+  const d = S.data;
+  const total = d.miembros.reduce((s,m)=>s+Number(m.saldo),0);
+  const atr = d.miembros.filter(m=>!m.aporte.al_dia).length;
+  const pend = d.pendientes;
+  return `
+  <div class="hero">
+    <div class="lbl">${d.tipo==="guia"?"Deuda de todos los dirigentes hoy":"Deuda de tus dirigentes hoy"}</div>
+    <div class="big num">${fmt(total)}</div>
+    <span class="chip">${atr?`${atr} de ${d.miembros.length} atrasados en el aporte`:"Todos al día con el aporte"}</span>
+  </div>
+  <div class="card">
+    <div class="row"><h2>${I("file")} Comprobantes para revisar</h2>${pend.length?`<span class="pill warn">${pend.length}</span>`:""}</div>
+    <div class="list" id="tPend">${pend.length ? pend.map(p=>`
+      <div class="item" style="flex-wrap:wrap"><div class="avatar sm">${esc(ini(p.miembro))}</div>
+        <div class="l"><div class="t">${esc(p.miembro)}</div><div class="muted small">${esc(p.concepto)} · ${p.fecha}</div></div>
+        <div class="num" style="font-weight:900;font-size:1.1rem">${fmt(p.monto)}</div>
+        <div class="actions" style="width:100%">
+          ${p.tiene_comprobante?`<button class="btn soft sm" data-ver="${p.id}">${I("file","sm")} Ver</button>`:`<span class="muted small" style="align-self:center">Sin archivo</span>`}
+          <button class="btn ok sm" data-ok="${p.id}">${I("check","sm")} Aprobar</button>
+          <button class="btn bad sm" data-no="${p.id}">${I("x","sm")} Rechazar</button></div></div>`).join("")
+      : `<div class="empty"><div class="ic ok">${I("check")}</div>No hay comprobantes pendientes.</div>`}</div>
+  </div>
+  <div class="card"><div class="row"><div><div class="muted small">Efectivo que cobraste</div><div class="num" style="font-weight:900;font-size:1.3rem">${fmt(d.efectivo_cobrado)}</div></div>
+    <button class="btn soft sm" data-tabgo="cobrar">${I("cash","sm")} Cobrar efectivo</button></div></div>`;
+}
+function tabDirigentes(){
+  const d = S.data;
+  let ms = d.miembros;
+  if(S.filtro==="atrasados") ms = ms.filter(m=>!m.aporte.al_dia);
+  if(S.filtro==="aldia") ms = ms.filter(m=>m.aporte.al_dia);
+  if(S.busca) ms = ms.filter(m=>m.nombre.toLowerCase().includes(S.busca.toLowerCase()));
+  const f = (id,t)=>`<button data-filtro="${id}" aria-pressed="${S.filtro===id}">${t}</button>`;
+  return `<div class="card">
+    <h2>${I("users")} ${d.tipo==="guia"?"Todos los dirigentes":"Tus dirigentes"}</h2>
+    <div class="search">${I("search")}<input id="busca" placeholder="Buscar por nombre" value="${esc(S.busca)}"></div>
+    <div class="filters">${f("todos","Todos")}${f("atrasados","Atrasados")}${f("aldia","Al día")}</div>
+    <div class="list" id="tMiembros">${ms.length ? ms.map(m=>{
+      const a=m.aporte;
+      const pill = a.meses_vencidos===0?"":(a.al_dia?`<span class="pill ok">Al día</span>`:`<span class="pill bad">Atraso ${fmt(a.atraso)}</span>`);
+      return `<div class="mem-wrap"><button class="mem" data-mem="${m.id}" aria-expanded="false">
+        <div class="avatar sm">${esc(ini(m.nombre))}</div>
+        <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(m.nombre)} ${pill}</div>
+          <div class="muted small">${fmt(a.mensual)}/mes · falta ${fmt(a.falta_anio)} del año${d.tipo==="guia"?` · ${m.tesorero?esc(m.tesorero):"sin tesorero"}`:""}</div></div>
+        <div style="text-align:right"><div class="muted tiny">Debe hoy</div><div class="num ${m.saldo>0?"debt":"paid"}">${m.saldo>0?fmt(m.saldo):"Nada"}</div></div>
+        <span class="chev">${I("chev")}</span></button><div class="det" data-det="${m.id}" hidden></div></div>`}).join("")
+      : `<div class="empty"><div class="ic">${I("search")}</div>No hay dirigentes con ese filtro.</div>`}</div></div>`;
+}
+function tabCobrar(){
+  const d = S.data;
+  const mOpts = d.miembros.map(m=>`<option value="${m.id}">${esc(m.nombre)}</option>`).join("");
+  return `
+  <div class="card"><h2>${I("cash")} Registrar pago en efectivo</h2>
+    <div class="muted small">Se aprueba en el momento y al dirigente le llega el recibo por mail.</div>
+    <label>Dirigente<select id="eMiembro">${mOpts}</select></label>
+    <div class="grid2"><label>Concepto<select id="eConcepto"><option value="">Aporte mensual</option>${d.eventos.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
+    <label>Monto ($)<input id="eMonto" type="number" inputmode="numeric" min="1" placeholder="15000"></label></div>
+    <button class="btn block" id="eGuardar">${I("check")} Registrar y generar recibo</button></div>
+  <div class="card"><h2>${I("gift")} Entregar un evento</h2>
+    <div class="muted small">Locro, lotería, agendas, bonos: se suma a la deuda del dirigente.</div>
+    <label>Dirigente<select id="aMiembro">${mOpts}</select></label>
+    <label>Evento<select id="aEvento">${d.eventos.map(e=>`<option value="${e.id}">${esc(e.nombre)} · ${fmt(e.precio)}</option>`).join("")}</select></label>
+    <div class="grid2"><label>Cantidad<input id="aCant" type="number" inputmode="numeric" min="1" value="1"></label>
+    <label>Total<input id="aTotal" readonly></label></div>
+    <button class="btn block" id="aGuardar">${I("plus")} Asignar</button></div>`;
+}
+
+// ===== Gestión (solo guía) =====
+function tabGestion(){
+  const p = S.panel; if(!p) return `<div class="card">No se pudo cargar la gestión.</div>`;
+  const tes = p.tesoreros, act = tes.filter(t=>t.activo);
+  const nomTes = id => (tes.find(t=>t.id===id)||{}).nombre;
+  const sinTes = p.miembros.filter(m=>m.activo && !m.tesorero_id).length;
+  const sec = {};
+  sec.tesoreros = `
+  <div class="card">
+    <div class="row"><h2>${I("award")} Tesoreros</h2><button class="btn sm" data-nuevo-tes>${I("plus","sm")} Nuevo</button></div>
+    <div class="list">${tes.map(t=>`
+      <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm ${t.rol==="guia"?"sun":""}">${esc(ini(t.nombre))}</div>
+        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
+        <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}</div></div>
+        <div class="actions" style="width:100%">
+          ${t.activo?`<button class="btn soft sm" data-asig="${t.id}">${I("users","sm")} Dirigentes a cargo</button>
+          <button class="btn soft sm" data-link-tes="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
+          <button class="btn ghost sm" data-edit-tes="${t.id}">${I("edit","sm")} Editar</button>
+          ${t.rol!=="guia"?`<button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Dar de baja":"Reactivar"}</button>`:""}
+        </div></div>`).join("")}</div>
+  </div>`;
+  sec.dirigentes = `
+  <div class="card">
+    <div class="row"><h2>${I("users")} Dirigentes</h2><button class="btn sm" data-nuevo-mem>${I("plus","sm")} Nuevo</button></div>
+    ${sinTes?`<div class="estado bad">${I("alert")}<span>${sinTes} ${sinTes===1?"dirigente sin tesorero":"dirigentes sin tesorero"} asignado</span></div>`:""}
+    <div class="list">${p.miembros.map(m=>`
+      <div class="item" style="flex-wrap:wrap;${m.activo?"":"opacity:.6"}"><div class="avatar sm">${esc(ini(m.nombre))}</div>
+        <div class="l"><div class="t">${esc(m.nombre)}${m.activo?"":` <span class="pill off">De baja</span>`}${m.email?"":` <span class="pill warn">Sin mail</span>`}</div>
+        <div class="muted small">${fmt(m.aporte_mensual)}/mes</div></div>
+        ${m.activo?`<label style="flex:1 1 100%">Tesorero a cargo<select data-cambiar-tes="${m.id}"><option value="">Sin tesorero</option>${act.map(t=>`<option value="${t.id}" ${m.tesorero_id===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</select></label>`:""}
+        <div class="actions" style="width:100%">
+          <button class="btn ghost sm" data-edit-mem="${m.id}">${I("edit","sm")} Editar</button>
+          ${m.activo?`<button class="btn ghost sm" data-link-mem="${m.id}">${I("msg","sm")} Enviar acceso</button>`:""}
+          <button class="btn ghost sm" data-baja-mem="${m.id}" data-activo="${m.activo}">${I("power","sm")} ${m.activo?"Dar de baja":"Reactivar"}</button>
+        </div></div>`).join("")}</div>
+  </div>`;
+  sec.eventos = `
+  <div class="card">
+    <div class="row"><h2>${I("gift")} Eventos</h2><button class="btn sm" data-nuevo-ev>${I("plus","sm")} Nuevo</button></div>
+    <div class="list">${p.eventos.map(e=>`
+      <div class="item" style="flex-wrap:wrap;${e.activo?"":"opacity:.6"}"><div class="ic sun">${I("gift")}</div>
+        <div class="l"><div class="t">${esc(e.nombre)}${e.activo?"":` <span class="pill off">Cerrado</span>`}</div>
+        <div class="muted small">${fmt(e.precio)} por ${esc(e.unidad)} · ${e.entregado} ${esc(e.unidad_plural)} entregados · cobrado ${fmt(e.cobrado)} de ${fmt(e.cargo)}</div></div>
+        <div class="actions" style="width:100%"><button class="btn ghost sm" data-edit-ev="${e.id}">${I("edit","sm")} Editar</button>
+          <button class="btn ghost sm" data-baja-ev="${e.id}" data-activo="${e.activo}">${I("power","sm")} ${e.activo?"Cerrar":"Reabrir"}</button></div></div>`).join("")}</div>
+  </div>`;
+  sec.mails = `
+  <div class="card">
+    <h2>${I("mail")} Recibos y recordatorios</h2>
+    <div class="estado ${S.mails?"ok":"neutral"}">${I(S.mails?"check":"power")}<span>${S.mails?"Mails automáticos encendidos":"Mails automáticos apagados"}</span></div>
+    <div class="muted small">Encendidos: cada vez que se aprueba un pago, al dirigente le llega el recibo por mail, y los días 1 y 16 de cada mes a los que deben les llega un recordatorio. Para encenderlos, el Gmail de la parroquia necesita la verificación en 2 pasos y una contraseña de aplicación cargada en Supabase. Mientras tanto, el recibo se manda por WhatsApp.</div>
+    <button class="btn ${S.mails?"bad":""} block" id="btnMailsOnOff">${I("power")} ${S.mails?"Apagar mails automáticos":"Encender mails automáticos"}</button>
+    <div class="grid2"><input id="mailPrueba" type="email" placeholder="Tu mail para probar" value="${esc(S.data.tesorero.email||"")}"><button class="btn soft" id="btnProbar">${I("send")} Enviar prueba</button></div>
+    <button class="btn soft block" id="btnRecordar">${I("clock")} Enviar recordatorio ahora a los que deben</button>
+    <button class="btn ghost" id="btnHist">${I("clock","sm")} Ver últimos envíos</button>
+    <div class="list" id="histMails" hidden></div>
+  </div>`;
+  sec.traspaso = `
+  <div class="card">
+    <h2>${I("award")} Dejar de ser guía</h2>
+    <div class="muted small">Pasale el rol de guía a otro tesorero. Esa persona va a poder ver y gestionar todo, y vos quedás como tesorero común (después te puede dar de baja).</div>
+    <label>Nuevo guía<select id="nuevoGuia">${act.filter(t=>!t.es_vos).map(t=>`<option value="${t.id}">${esc(t.nombre)}</option>`).join("")}</select></label>
+    <button class="btn bad block" id="btnTraspaso">${I("award")} Pasar el rol de guía</button>
+  </div>`;
+  sec.ajustes = `
+  <div class="card"><h2>${I("gear")} Ajustes generales</h2>
+    <label>Nombre de la parroquia o grupo (sale en recibos y mails)<input id="cfgNom" value="${esc(p.config.parroquia||"")}"></label>
+    <label>Dirección de la app (para los links de los recibos)<input id="cfgUrl" inputmode="url" value="${esc(p.config.app_url||"")}"></label>
+    <div class="muted small">Si mudás la app a otra dirección (por ejemplo a Vercel), cambiala acá para que los recibos y recordatorios lleven el link nuevo. Después tenés que mandarle a cada uno su link nuevo desde Tesoreros o Dirigentes.</div>
+    <button class="btn block" id="cfgGuardar">${I("check")} Guardar</button>
+    <div class="muted tiny">Esta app está abierta en: ${esc(location.origin + location.pathname)}</div>
+  </div>`;
+  sec.drive = `
+  <div class="card"><h2>${I("book")} Libro diario en Google Drive</h2>
+    <div class="muted small">Una planilla de Google que se actualiza sola cada hora con todos los ingresos y gastos, el saldo y el resultado de cada evento. Se configura una sola vez:</div>
+    <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
+      <li>Con el Gmail de la parroquia, creá una planilla nueva en <b>sheets.new</b> y ponele de nombre "Libro diario".</li>
+      <li>Arriba: <b>Extensiones → Apps Script</b>.</li>
+      <li>Borrá lo que aparece, pegá el código de abajo y tocá el ícono de <b>guardar</b>.</li>
+      <li>Arriba, en la lista de funciones, elegí <b>instalar</b> y tocá <b>Ejecutar</b>.</li>
+      <li>Google te pide permiso: <b>Revisar permisos</b> → elegí el Gmail → <b>Configuración avanzada</b> → <b>Ir a Libro diario</b> → <b>Permitir</b>.</li>
+      <li>Volvé a la planilla: van a aparecer las hojas <b>Libro diario</b>, <b>Por evento</b> y <b>Por mes</b>. Desde ahí se actualizan solas cada hora.</li>
+    </ol>
+    ${S.token?`<textarea id="scriptDrive" readonly style="width:100%;min-height:180px;font-family:ui-monospace,Consolas,monospace;font-size:.75rem;border:2px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);color:var(--ink)">${esc(scriptDrive(S.token))}</textarea>
+    <button class="btn block" id="copiarScript">${I("copy")} Copiar código</button>
+    <div class="muted tiny">El código tiene una clave de solo lectura: sirve para leer el libro, no para modificar nada. No lo compartas fuera de la tesorería.</div>`:`<div class="muted small">Cargando código…</div>`}
+  </div>`;
+  const subs = [["tesoreros","Tesoreros"],["dirigentes","Dirigentes"],["eventos","Eventos"],["mails","Mails"],["drive","Libro en Drive"],["ajustes","Ajustes"],["traspaso","Traspaso"]];
+  if(!sec[S.sub]) S.sub = "tesoreros";
+  return `<div class="filters" style="position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0">${subs.map(([id,t])=>`<button data-sub="${id}" aria-pressed="${S.sub===id}">${t}</button>`).join("")}</div>` + sec[S.sub];
+}
+function tabReportes(){
+  const p = S.panel, c = S.caja; if(!p || !c) return `<div class="card">No se pudo cargar.</div>`;
+  const r = p.reportes;
+  const tes = p.tesoreros.filter(t=>t.activo && (t.rol!=="guia" || t.miembros>0 || t.efectivo>0));
+  const pct = (a,b)=> b>0 ? Math.min(100, Math.round(a/b*100)) : 0;
+  const saldo = c.ingresos - c.egresos;
+  const evs = c.eventos.filter(e=>e.vendido>0 || e.gastos>0);
+  return `
+  <div class="hero">
+    <div class="lbl">Saldo de caja (ingresos menos gastos)</div>
+    <div class="big num">${fmt(saldo)}</div>
+    <span class="chip">${c.movimientos} movimientos en el libro diario</span>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><span class="k">Ingresos</span><span class="v paid">${fmt(c.ingresos)}</span></div>
+    <div class="kpi"><span class="k">Gastos</span><span class="v debt">${fmt(c.egresos)}</span></div>
+    <div class="kpi"><span class="k">Deuda vencida de dirigentes</span><span class="v">${fmt(r.adeudado_hoy)}</span></div>
+    <div class="kpi"><span class="k">Atrasados en el aporte</span><span class="v">${r.atrasados} <span class="muted small">de ${r.dirigentes}</span></span></div>
+  </div>
+  <div class="card"><h2>${I("gift")} Resultado por evento</h2>
+    ${evs.length ? evs.map(e=>{ const res = e.cobrado - e.gastos, proy = e.vendido - e.gastos; return `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:10px 0;border-top:1px solid var(--line)">
+      <div class="row"><span class="t" style="font-weight:800">${esc(e.nombre)}</span>
+        <span class="pill ${res>=0?"ok":"bad"}">${res>=0?"Ganancia":"Pérdida"} ${fmt(Math.abs(res))}</span></div>
+      <div class="stats">
+        <div class="stat"><span class="muted tiny">Vendido (${e.unidades} ${esc(e.unidad_plural)})</span><b>${fmt(e.vendido)}</b></div>
+        <div class="stat"><span class="muted tiny">Cobrado</span><b class="paid">${fmt(e.cobrado)}</b></div>
+        <div class="stat"><span class="muted tiny">Gastos</span><b class="debt">${fmt(e.gastos)}</b></div>
+      </div>
+      <div class="prog"><span style="width:${pct(e.cobrado, e.vendido)}%"></span></div>
+      <div class="muted small">${e.vendido>e.cobrado?`Falta cobrar ${fmt(e.vendido-e.cobrado)}. Si se cobra todo, el resultado sería ${proy>=0?"ganancia":"pérdida"} de ${fmt(Math.abs(proy))}.`:"Cobrado completo."}
+        ${e.gastos_detalle.length?`<br>Gastos: ${e.gastos_detalle.map(g=>`${esc(g.categoria)} ${fmt(g.monto)}`).join(" · ")}`:""}</div>
+    </div>`}).join("") : `<div class="muted small">Todavía no hay eventos con ventas o gastos.</div>`}
+    ${c.egresos_generales>0?`<div class="muted small">Además hay ${fmt(c.egresos_generales)} en gastos generales (no asignados a un evento).</div>`:""}
+  </div>
+  <div class="card"><h2>${I("heart")} Aporte anual</h2>
+    <div class="row small"><span class="muted">Cobrado ${fmt(r.cobrado_aportes)} de ${fmt(r.aporte_comprometido)}</span><b>${pct(r.cobrado_aportes, r.aporte_comprometido)}%</b></div>
+    <div class="prog"><span style="width:${pct(r.cobrado_aportes, r.aporte_comprometido)}%"></span></div>
+    <div class="muted small">Falta cobrar ${fmt(r.aporte_falta_anio)} para cerrar el año. Van ${r.meses_vencidos} de ${r.cantidad_meses} cuotas.</div></div>
+  <div class="card"><h2>${I("book")} Libro diario</h2>
+    <div class="muted small">Últimos movimientos. El libro completo está en la planilla de Drive (Gestión → Libro en Drive).</div>
+    <div class="list">${c.libro.slice(0,30).map(l=>`
+      <div class="item"><div class="ic ${l.ingreso>0?"ok":"bad"}">${I(l.ingreso>0?"cash":"receipt")}</div>
+        <div class="l"><div class="t">${esc(l.concepto)}</div><div class="muted small">${l.fecha.slice(0,5)} · ${esc(l.detalle)} · ${esc(l.nro)}</div></div>
+        <div style="text-align:right"><div class="num ${l.ingreso>0?"paid":"debt"}">${l.ingreso>0?"+ "+fmt(l.ingreso):"− "+fmt(l.egreso)}</div>
+        <div class="muted tiny num">Saldo ${fmt(l.saldo)}</div></div></div>`).join("")}</div></div>
+  <div class="card"><h2>${I("award")} Por tesorero</h2><div class="tablewrap"><table class="t">
+    <thead><tr><th>Tesorero</th><th class="n">Dirigentes</th><th class="n">Pendientes</th><th class="n">Efectivo</th></tr></thead>
+    <tbody>${tes.map(t=>`<tr><td>${esc(t.nombre)}</td><td class="n">${t.miembros}</td><td class="n">${t.pendientes}</td><td class="n">${fmt(t.efectivo)}</td></tr>`).join("")}</tbody></table></div>
+    ${r.sin_tesorero?`<div class="estado bad">${I("alert")}<span>${r.sin_tesorero} ${r.sin_tesorero===1?"dirigente":"dirigentes"} sin tesorero</span></div>`:""}</div>
+  <div class="card"><h2>${I("cash")} Efectivo</h2>
+    <div class="stats"><div class="stat"><span class="muted tiny">Cobrado en efectivo</span><b>${fmt(c.ingresos_efectivo)}</b></div>
+    <div class="stat"><span class="muted tiny">Gastado en efectivo</span><b>${fmt(c.egresos_efectivo)}</b></div>
+    <div class="stat"><span class="muted tiny">Debería haber en efectivo</span><b>${fmt(c.ingresos_efectivo - c.egresos_efectivo)}</b></div></div></div>`;
+}
+
+// ===== Gastos =====
+const CATEGORIAS = ["Mercadería","Insumos","Premios","Impresión","Alquiler","Servicios","Transporte","Actividades","Otros"];
+function tabGastos(){
+  const gs = S.gastos || [];
+  const total = gs.reduce((s,g)=>s+Number(g.monto),0);
+  return `
+  <div class="hero">
+    <div class="lbl">${S.data.tipo==="guia"?"Gastos cargados por toda la tesorería":"Gastos que cargaste"}</div>
+    <div class="big num">${fmt(total)}</div>
+    <button class="btn block" data-nuevo-gasto>${I("plus")} Cargar un gasto</button>
+  </div>
+  <div class="card"><h2>${I("receipt")} Gastos</h2><div class="list">${gs.length ? gs.map(g=>`
+    <div class="item" style="flex-wrap:wrap"><div class="ic bad">${I("receipt")}</div>
+      <div class="l"><div class="t">${esc(g.descripcion)}</div>
+      <div class="muted small">${g.fecha} · ${esc(g.categoria)} · ${g.evento?esc(g.evento):"Gasto general"} · ${g.medio}${S.data.tipo==="guia"&&g.cargado_por?` · ${esc(g.cargado_por)}`:""}</div></div>
+      <div class="num debt">${fmt(g.monto)}</div>
+      <div class="actions" style="width:100%">
+        ${g.tiene_comprobante?`<button class="btn ghost sm" data-ver-gasto="${g.id}">${I("file","sm")} Ver factura</button>`:`<button class="btn ghost sm" data-adjuntar-gasto="${g.id}">${I("upload","sm")} Adjuntar factura</button>`}
+        ${g.puede_anular?`<button class="btn ghost sm" data-anular-gasto="${g.id}">${I("x","sm")} Anular</button>`:""}
+      </div></div>`).join("")
+    : `<div class="empty"><div class="ic">${I("receipt")}</div>Todavía no hay gastos cargados.</div>`}</div></div>`;
+}
+function hoyISO(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+async function subirFacturaGasto(gid, f){
+  f = await comprimir(f);
+  if(f.size > 10*1024*1024) throw new Error("El archivo pesa más de 10 MB.");
+  const fd = new FormData(); fd.append("tipo","gasto"); fd.append("codigo",S.codigo); fd.append("gasto_id",String(gid)); fd.append("archivo",f);
+  await fnComprobantes(fd);
+}
+function hojaGasto(){
+  const evs = S.data.eventos;
+  abrirHoja(`<h2>Cargar un gasto</h2>
+    <label>¿Qué se compró o pagó?<input id="gDesc" placeholder="Ej.: Carne y verduras para el locro"></label>
+    <div class="grid2"><label>Monto ($)<input id="gMonto" type="number" inputmode="numeric" min="1"></label>
+    <label>Fecha<input id="gFecha" type="date" value="${hoyISO()}"></label></div>
+    <label>¿Para qué evento?<select id="gEv"><option value="">Gasto general (no es de un evento)</option>${evs.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
+    <div class="grid2"><label>Tipo de gasto<select id="gCat">${CATEGORIAS.map(c=>`<option>${c}</option>`).join("")}</select></label>
+    <label>¿Cómo se pagó?<select id="gMedio"><option>Efectivo</option><option>Transferencia</option></select></label></div>
+    <label class="file" id="gFileBox">${I("upload")}<span id="gFileTxt"><b>Foto de la factura o ticket</b><br><span class="small">Opcional, se puede agregar después</span></span>
+      <input id="gArchivo" type="file" accept="image/*,application/pdf"></label>
+    <div class="err" id="gErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="gOk">${I("check")} Guardar gasto</button></div>`,
+  (s, cerrar)=>{
+    const inp = s.querySelector("#gArchivo");
+    inp.onchange = ()=>{ const f=inp.files[0]; s.querySelector("#gFileBox").classList.toggle("has",!!f); s.querySelector("#gFileTxt").innerHTML = f?`<b>${esc(f.name)}</b>`:"<b>Foto de la factura o ticket</b>"; };
+    const b = s.querySelector("#gOk"), err = s.querySelector("#gErr");
+    b.onclick = () => ocupado(b, async ()=>{
+      err.hidden = true;
+      try{
+        const ev = s.querySelector("#gEv").value;
+        const r = await rpc("registrar_gasto",{p_codigo:S.codigo,p_fecha:s.querySelector("#gFecha").value||null,p_descripcion:s.querySelector("#gDesc").value,
+          p_categoria:s.querySelector("#gCat").value,p_evento:ev?Number(ev):null,p_monto:Number(s.querySelector("#gMonto").value),p_medio:s.querySelector("#gMedio").value});
+        if(inp.files[0]){ try{ await subirFacturaGasto(r.id, inp.files[0]); }catch(e){ toast("El gasto se guardó, pero la factura no: "+e.message); } }
+        cerrar(); await recargar(); toast("Gasto guardado");
+      }catch(e){ err.textContent=e.message; err.hidden=false; }
+    });
+  });
+}
+
+// ===== Código para la planilla de Drive =====
+function scriptDrive(token){
+  return `// Libro diario de la tesorería: se actualiza solo cada hora.
+const API = "${SUPABASE_URL}/rest/v1/rpc/libro_hoja";
+const KEY = "${SUPABASE_KEY}";
+const TOKEN = "${token}";
+
+function instalar() {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger("actualizar").timeBased().everyHours(1).create();
+  actualizar();
+}
+
+function actualizar() {
+  const r = UrlFetchApp.fetch(API, { method: "post", contentType: "application/json",
+    headers: { apikey: KEY }, payload: JSON.stringify({ p_token: TOKEN }), muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error("No se pudo leer la app: " + r.getContentText());
+  const d = JSON.parse(r.getContentText());
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const fecha = s => { const [dd, mm, aa] = s.split("/").map(Number); return new Date(aa, mm - 1, dd); };
+  const n = x => Number(x) || 0;
+
+  escribir(ss, "Libro diario",
+    ["Fecha", "Tipo", "N°", "Concepto", "Detalle", "Medio", "Tesorero", "Ingreso", "Gasto", "Saldo"],
+    d.libro.map(x => [fecha(x.fecha), x.tipo, x.nro, x.concepto, x.detalle, x.medio, x.tesorero,
+      n(x.ingreso) || "", n(x.egreso) || "", n(x.saldo)]), [8, 9, 10], 1);
+
+  escribir(ss, "Por evento",
+    ["Evento", "Unidades", "Vendido", "Cobrado", "Falta cobrar", "Gastos", "Resultado (cobrado - gastos)"],
+    d.eventos.filter(e => n(e.vendido) || n(e.gastos)).map(e => [e.nombre, n(e.unidades), n(e.vendido), n(e.cobrado),
+      n(e.vendido) - n(e.cobrado), n(e.gastos), n(e.cobrado) - n(e.gastos)]), [3, 4, 5, 6, 7], 0);
+
+  const meses = {};
+  d.libro.forEach(x => { const f = fecha(x.fecha); const k = f.getFullYear() + "-" + String(f.getMonth() + 1).padStart(2, "0");
+    meses[k] = meses[k] || [0, 0]; meses[k][0] += n(x.ingreso); meses[k][1] += n(x.egreso); });
+  escribir(ss, "Por mes", ["Mes", "Ingresos", "Gastos", "Resultado"],
+    Object.keys(meses).sort().map(k => [k, meses[k][0], meses[k][1], meses[k][0] - meses[k][1]]), [2, 3, 4], 0);
+
+  ss.getSheetByName("Libro diario").getRange("L1").setValue(d.parroquia + " · actualizado " + d.actualizado);
+}
+
+function escribir(ss, nombre, enc, filas, colsPlata, colFecha) {
+  const h = ss.getSheetByName(nombre) || ss.insertSheet(nombre);
+  h.clearContents();
+  h.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight("bold").setBackground("#E6EBFB");
+  h.setFrozenRows(1);
+  if (!filas.length) return;
+  h.getRange(2, 1, filas.length, enc.length).setValues(filas);
+  colsPlata.forEach(c => h.getRange(2, c, filas.length, 1).setNumberFormat('"$" #,##0;[Red]-"$" #,##0'));
+  if (colFecha) h.getRange(2, colFecha, filas.length, 1).setNumberFormat("dd/mm/yyyy");
+  h.autoResizeColumns(1, enc.length);
+}
+`;
+}
+function montarExtras(){
+  const m = $("vMain");
+  const nuevo = m.querySelector("[data-nuevo-gasto]"); if(nuevo) nuevo.onclick = hojaGasto;
+  m.querySelectorAll("[data-ver-gasto]").forEach(b=> b.onclick = (e)=>{ e.stopPropagation(); ocupado(b, async()=>{
+    try{ const {url} = await fnComprobantes({accion:"ver_gasto",codigo:S.codigo,gasto_id:Number(b.dataset.verGasto)}); window.open(url,"_blank","noopener"); }catch(er){ toast(er.message) } }); });
+  m.querySelectorAll("[data-adjuntar-gasto]").forEach(b=> b.onclick = (e)=>{ e.stopPropagation();
+    const inp = document.createElement("input"); inp.type="file"; inp.accept="image/*,application/pdf";
+    inp.onchange = ()=> inp.files[0] && ocupado(b, async()=>{ try{ await subirFacturaGasto(Number(b.dataset.adjuntarGasto), inp.files[0]); await recargar(); toast("Factura adjuntada"); }catch(er){ toast(er.message) } });
+    inp.click(); });
+  m.querySelectorAll("[data-anular-gasto]").forEach(b=> b.onclick = async (e)=>{ e.stopPropagation();
+    if(!await confirmar("¿Anular este gasto?","Deja de contar en la caja, en el libro diario y en el resultado del evento.","Anular")) return;
+    ocupado(b, async()=>{ try{ await rpc("anular_gasto",{p_codigo:S.codigo,p_id:Number(b.dataset.anularGasto)}); await recargar(); toast("Gasto anulado"); }catch(er){ toast(er.message) } }); });
+  if($("btnMailsOnOff")) $("btnMailsOnOff").onclick = async () => {
+    if(!S.mails && !await confirmar("¿Encender los mails?","Hacelo solo si ya cargaste el Gmail y la contraseña de aplicación en Supabase. Probalo primero con Enviar prueba.","Encender","")) return;
+    ocupado($("btnMailsOnOff"), async()=>{ try{ await rpc("set_mails_activos",{p_codigo:S.codigo,p_activo:!S.mails}); await recargar(); toast(S.mails?"Mails encendidos":"Mails apagados"); }catch(er){ toast(er.message) } }); };
+  if($("cfgGuardar")) $("cfgGuardar").onclick = () => ocupado($("cfgGuardar"), async()=>{
+    try{ await rpc("guardar_config",{p_codigo:S.codigo,p_parroquia:$("cfgNom").value,p_app_url:$("cfgUrl").value}); await recargar(); toast("Ajustes guardados"); }catch(er){ toast(er.message) } });
+  if(S.tab==="gestion" && S.sub==="drive" && !S.token){
+    rpc("libro_token",{p_codigo:S.codigo}).then(t=>{ S.token=t; render(); }).catch(er=>toast(er.message));
+  }
+  if($("copiarScript")) $("copiarScript").onclick = async ()=>{
+    try{ await navigator.clipboard.writeText($("scriptDrive").value); toast("Código copiado"); }
+    catch(_){ $("scriptDrive").select(); toast("Seleccionado: copialo con Ctrl+C"); } };
+}
+
+// ===== Recibo =====
+function textoRecibo(r){
+  const det = r.cuenta.conceptos.filter(c=>c.saldo>0).map(c=>`• ${c.nombre}: ${fmt(c.saldo)}`).join("\n");
+  return `*${r.parroquia}* · Recibo N° ${r.recibo_nro}\n${r.miembro}\nFecha: ${r.fecha} · ${r.medio}\nConcepto: ${r.concepto}\nMonto recibido: *${fmt(r.monto)}*\n\nSaldo pendiente: ${fmt(r.cuenta.saldo)}` +
+    (det ? "\n"+det : "\n¡Estás al día! Gracias.") +
+    `\n\nAporte anual: ${estadoAporte(r.cuenta.aporte).txt}\nFalta para cancelar el año: ${fmt(r.cuenta.aporte.falta_anio)}` +
+    `\n\nTu cuenta y carga de comprobantes:\n${linkPersonal(r.cuenta.miembro.codigo)}`;
+}
+function hojaRecibo(r){
+  const txt = textoRecibo(r);
+  abrirHoja(`<div class="estado ok">${I("check")}<span>Pago aprobado · Recibo N° ${r.recibo_nro}</span></div>
+    <div class="muted small">${S.data.tipo==="guia"&&!S.mails?`${I("msg","sm")} Mandale el recibo por WhatsApp.`:r.email?`${I("mail","sm")} Si los mails están encendidos, el recibo le llega solo a <b>${esc(r.email)}</b>. Igual podés mandarlo por WhatsApp.`:`${I("alert","sm")} Este dirigente no tiene mail cargado: pedile al guía que lo agregue.`}</div>
+    <div class="receipt">${esc(txt)}</div>
+    <div class="actions">${r.celular?`<a class="btn wa" target="_blank" rel="noopener" href="${waLink(r.celular, txt)}">${I("msg")} Enviar por WhatsApp</a>`:""}
+      <button class="btn soft" data-copiar>${I("copy")} Copiar</button></div>
+    <button class="btn ghost" data-cerrar>Cerrar</button>`,
+  (s)=>{ s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(txt);toast("Recibo copiado")}catch(_){toast("No se pudo copiar")} }; });
+}
+function hojaLink(nombre, celular, codigo, esTesorero){
+  const link = linkPersonal(codigo);
+  const msg = esTesorero
+    ? `Hola ${primer(nombre)}, este es tu acceso como tesorero a la app de aportes. No lo compartas:\n${link}`
+    : `Hola ${primer(nombre)}, este es tu link personal para ver tu cuenta de aportes y subir comprobantes. No lo compartas:\n${link}`;
+  abrirHoja(`<h2>Acceso de ${esc(nombre)}</h2>
+    <div class="receipt" style="word-break:break-all">${esc(link)}</div>
+    <div class="muted small">Código: <b>${esc(codigo)}</b>. Si alguien más lo conoce, generá uno nuevo: el anterior deja de funcionar.</div>
+    <div class="actions">${celular?`<a class="btn wa" target="_blank" rel="noopener" href="${waLink(celular,msg)}">${I("msg")} Enviar por WhatsApp</a>`:""}
+      <button class="btn soft" data-copiar>${I("copy")} Copiar link</button></div>
+    <button class="btn ghost" data-regenerar>${I("key","sm")} Generar código nuevo</button>
+    <button class="btn ghost" data-cerrar>Cerrar</button>`,
+  (s, cerrar)=>{
+    s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(link);toast("Link copiado")}catch(_){toast("No se pudo copiar")} };
+    s.querySelector("[data-regenerar]").onclick = async ()=>{
+      cerrar();
+      if(!await confirmar("¿Generar código nuevo?", `El link actual de ${esc(nombre)} va a dejar de funcionar y vas a tener que mandarle el nuevo.`, "Generar")) return;
+      try{
+        const tipo = esTesorero?"tesorero":"miembro";
+        const lista = esTesorero?S.panel.tesoreros:S.panel.miembros;
+        const it = lista.find(x=>x.codigo===codigo);
+        const nuevo = await rpc("regenerar_codigo",{p_codigo:S.codigo,p_tipo:tipo,p_id:it.id});
+        if(codigo===S.codigo){ S.codigo = nuevo; store("aportes_codigo", nuevo); }
+        await recargar(); hojaLink(nombre, celular, nuevo, esTesorero);
+      }catch(e){ toast(e.message) }
+    };
+  });
+}
+
+// ===== Formularios de gestión =====
+function hojaTesorero(t){
+  abrirHoja(`<h2>${t?"Editar tesorero":"Nuevo tesorero"}</h2>
+    <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
+    <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(t?.celular||"")}"></label>
+    <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{ const r = await rpc("guardar_tesorero",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      cerrar(); await recargar(); toast("Tesorero guardado"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true);
+    }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
+}
+function hojaMiembro(m){
+  const act = S.panel.tesoreros.filter(t=>t.activo);
+  abrirHoja(`<h2>${m?"Editar dirigente":"Nuevo dirigente"}</h2>
+    <label>Nombre y apellido<input id="fNom" value="${esc(m?.nombre||"")}"></label>
+    <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(m?.celular||"")}"></label>
+    <label>Mail (para recibos)<input id="fMail" type="email" value="${esc(m?.email||"")}"></label></div>
+    <div class="grid2"><label>Aporte mensual ($)<input id="fAp" type="number" inputmode="numeric" min="0" value="${m?Math.round(m.aporte_mensual):""}"></label>
+    <label>Tesorero<select id="fTes"><option value="">Sin tesorero</option>${act.map(t=>`<option value="${t.id}" ${m?.tesorero_id===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</select></label></div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{ const tes = s.querySelector("#fTes").value;
+      const r = await rpc("guardar_miembro",{p_codigo:S.codigo,p_id:m?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value,p_tesorero:tes?Number(tes):null,p_aporte:Number(s.querySelector("#fAp").value)});
+      cerrar(); await recargar(); toast("Dirigente guardado"); if(!m) hojaLink(r.nombre, r.celular, r.codigo, false);
+    }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
+}
+function hojaEvento(e){
+  abrirHoja(`<h2>${e?"Editar evento":"Nuevo evento"}</h2>
+    <label>Nombre<input id="fNom" placeholder="Ej.: Locro 9 de Julio" value="${esc(e?.nombre||"")}"></label>
+    <div class="grid2"><label>Se vende por (singular)<input id="fU" placeholder="porción, número, bono" value="${esc(e?.unidad||"")}"></label>
+    <label>Plural<input id="fUP" placeholder="porciones, números, bonos" value="${esc(e?.unidad_plural||"")}"></label></div>
+    <label>Precio por unidad ($)<input id="fP" type="number" inputmode="numeric" min="0" value="${e?Math.round(e.precio):""}"></label>
+    ${e?`<div class="muted small">Si cambiás el precio, vale para las próximas entregas. Lo ya entregado mantiene su precio.</div>`:""}
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{ await rpc("guardar_evento",{p_codigo:S.codigo,p_id:e?.id??null,p_nombre:s.querySelector("#fNom").value,p_unidad:s.querySelector("#fU").value,p_unidad_plural:s.querySelector("#fUP").value,p_precio:Number(s.querySelector("#fP").value)});
+      cerrar(); await recargar(); toast("Evento guardado");
+    }catch(er){ const x=s.querySelector("#fErr"); x.textContent=er.message; x.hidden=false; } }); });
+}
+function hojaAsignar(t){
+  const ms = S.panel.miembros.filter(m=>m.activo);
+  const nom = id => (S.panel.tesoreros.find(x=>x.id===id)||{}).nombre;
+  abrirHoja(`<h2>Dirigentes a cargo de ${esc(t.nombre)}</h2>
+    <div class="muted small">Marcá los que quedan a su cargo. Si marcás uno que tenía otro tesorero, pasa a ${esc(primer(t.nombre))}.</div>
+    <div class="list">${ms.map(m=>`<label class="check"><input type="checkbox" value="${m.id}" ${m.tesorero_id===t.id?"checked":""}>
+      <span style="flex:1">${esc(m.nombre)}<br><span class="muted tiny">${m.tesorero_id?(m.tesorero_id===t.id?"A su cargo":"Ahora con "+esc(nom(m.tesorero_id))):"Sin tesorero"}</span></span></label>`).join("")}</div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{
+      const cambios = [];
+      s.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+        const m = ms.find(x=>x.id===Number(cb.value));
+        if(cb.checked && m.tesorero_id!==t.id) cambios.push([m.id, t.id]);
+        if(!cb.checked && m.tesorero_id===t.id) cambios.push([m.id, null]);
+      });
+      for(const [mid, tid] of cambios) await rpc("asignar_tesorero",{p_codigo:S.codigo,p_miembro:mid,p_tesorero:tid});
+      cerrar(); await recargar(); toast(cambios.length?`Listo, ${cambios.length} ${cambios.length===1?"cambio":"cambios"}`:"Sin cambios");
+    }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
+}
+
+// ===== Eventos de las pantallas =====
+function calcTotal(){
+  const ev = (S.data.eventos||[]).find(e=>String(e.id)===$("aEvento")?.value);
+  if($("aTotal")) $("aTotal").value = ev ? fmt((Number($("aCant").value)||0)*ev.precio) : "";
+}
+function montarTesorero(){
+  const m = $("vMain");
+  m.querySelector("[data-salir]").onclick = salir;
+  m.onclick = async e => {
+    const b = e.target.closest("button,[data-mem]"); if(!b) return;
+    const ds = b.dataset;
+    if(ds.tabgo){ S.tab=ds.tabgo; render(); return; }
+    if(ds.ver) return ocupado(b, async()=>{ try{ const {url} = await fnComprobantes({accion:"ver",codigo:S.codigo,pago_id:Number(ds.ver)});
+        const a=document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener"; a.className="btn soft sm"; a.innerHTML=`${I("file","sm")} Abrir ↗`; b.replaceWith(a); a.click(); }catch(er){ toast(er.message) } });
+    if(ds.ok) return ocupado(b, async()=>{ try{ const r = await rpc("verificar_pago",{p_codigo:S.codigo,p_pago:Number(ds.ok),p_aprobar:true}); await recargar(); hojaRecibo(r); }catch(er){ toast(er.message) } });
+    if(ds.no){ if(!await confirmar("¿Rechazar el comprobante?","El pago no se suma a la cuenta del dirigente. Avisale por qué lo rechazaste.","Rechazar")) return;
+      return ocupado(b, async()=>{ try{ await rpc("verificar_pago",{p_codigo:S.codigo,p_pago:Number(ds.no),p_aprobar:false}); await recargar(); toast("Comprobante rechazado"); }catch(er){ toast(er.message) } }); }
+    if(ds.filtro){ S.filtro=ds.filtro; render(); return; }
+    if(ds.sub){ S.sub=ds.sub; render(); scrollTo({top:0}); return; }
+    if(ds.reenviar) return ocupado(b, async()=>{ try{ await rpc("reenviar_recibo",{p_codigo:S.codigo,p_pago:Number(ds.reenviar)}); toast("Recibo reenviado por mail"); }catch(er){ toast(er.message) } });
+    if(ds.mem!==undefined && b.classList.contains("mem")) return abrirDetalle(b);
+    // Gestión
+    const P = S.panel;
+    if(ds.nuevoTes!==undefined) return hojaTesorero(null);
+    if(ds.editTes) return hojaTesorero(P.tesoreros.find(x=>x.id==ds.editTes));
+    if(ds.asig) return hojaAsignar(P.tesoreros.find(x=>x.id==ds.asig));
+    if(ds.linkTes){ const t=P.tesoreros.find(x=>x.id==ds.linkTes); return hojaLink(t.nombre,t.celular,t.codigo,true); }
+    if(ds.bajaTes){ const t=P.tesoreros.find(x=>x.id==ds.bajaTes), act = ds.activo==="true";
+      if(act && !await confirmar(`¿Dar de baja a ${t.nombre}?`, `Su código deja de funcionar y sus ${t.miembros} dirigentes quedan sin tesorero hasta que los asignes a otro.`, "Dar de baja")) return;
+      return ocupado(b, async()=>{ try{ const r=await rpc("set_tesorero_activo",{p_codigo:S.codigo,p_id:t.id,p_activo:!act}); await recargar(); toast(act?`Dado de baja. ${r.liberados} dirigentes quedaron sin tesorero.`:"Reactivado"); }catch(er){ toast(er.message) } }); }
+    if(ds.nuevoMem!==undefined) return hojaMiembro(null);
+    if(ds.editMem) return hojaMiembro(P.miembros.find(x=>x.id==ds.editMem));
+    if(ds.linkMem){ const x=P.miembros.find(y=>y.id==ds.linkMem); return hojaLink(x.nombre,x.celular,x.codigo,false); }
+    if(ds.bajaMem){ const x=P.miembros.find(y=>y.id==ds.bajaMem), act = ds.activo==="true";
+      if(act && !await confirmar(`¿Dar de baja a ${x.nombre}?`, "Deja de aparecer en las listas, no recibe recordatorios y su link deja de funcionar. Su historial se guarda y lo podés reactivar.", "Dar de baja")) return;
+      return ocupado(b, async()=>{ try{ await rpc("set_miembro_activo",{p_codigo:S.codigo,p_id:x.id,p_activo:!act}); await recargar(); toast(act?"Dirigente dado de baja":"Dirigente reactivado"); }catch(er){ toast(er.message) } }); }
+    if(ds.nuevoEv!==undefined) return hojaEvento(null);
+    if(ds.editEv) return hojaEvento(P.eventos.find(x=>x.id==ds.editEv));
+    if(ds.bajaEv){ const act = ds.activo==="true";
+      return ocupado(b, async()=>{ try{ await rpc("set_evento_activo",{p_codigo:S.codigo,p_id:Number(ds.bajaEv),p_activo:!act}); await recargar(); toast(act?"Evento cerrado: ya no se puede entregar":"Evento reabierto"); }catch(er){ toast(er.message) } }); }
+  };
+  m.onchange = async e => {
+    const sel = e.target.closest("[data-cambiar-tes]"); if(!sel) return;
+    try{ await rpc("asignar_tesorero",{p_codigo:S.codigo,p_miembro:Number(sel.dataset.cambiarTes),p_tesorero:sel.value?Number(sel.value):null}); await recargar(); toast("Tesorero asignado"); }catch(er){ toast(er.message) }
+  };
+  const busca = $("busca");
+  if(busca){ busca.oninput = ()=>{ S.busca = busca.value; const pos = busca.selectionStart; render(); const nb=$("busca"); nb.focus(); nb.setSelectionRange(pos,pos); }; }
+  if($("aEvento")){ $("aEvento").onchange=calcTotal; $("aCant").oninput=calcTotal; calcTotal(); }
+  if($("eGuardar")) $("eGuardar").onclick = () => ocupado($("eGuardar"), async ()=>{
+    const monto = Number($("eMonto").value); if(!(monto>0)){ toast("Escribí el monto recibido"); return; }
+    try{ const r = await rpc("registrar_efectivo",{p_codigo:S.codigo,p_miembro:Number($("eMiembro").value),p_evento:$("eConcepto").value?Number($("eConcepto").value):null,p_monto:monto});
+      await recargar(); hojaRecibo(r); }catch(er){ toast(er.message) }
+  });
+  if($("aGuardar")) $("aGuardar").onclick = () => ocupado($("aGuardar"), async ()=>{
+    const cant = Number($("aCant").value); if(!(cant>0)){ toast("Escribí una cantidad"); return; }
+    const nom = $("aMiembro").selectedOptions[0]?.textContent || "";
+    try{ await rpc("asignar_evento",{p_codigo:S.codigo,p_miembro:Number($("aMiembro").value),p_evento:Number($("aEvento").value),p_cantidad:cant}); await recargar(); toast(`Asignado a ${nom}`); }catch(er){ toast(er.message) }
+  });
+  if($("btnProbar")) $("btnProbar").onclick = () => ocupado($("btnProbar"), async ()=>{
+    try{ await rpc("probar_mail",{p_codigo:S.codigo,p_destino:$("mailPrueba").value}); toast("Prueba enviada. Revisá tu casilla (y spam) en un minuto."); }catch(er){ toast(er.message) }
+  });
+  if($("btnRecordar")) $("btnRecordar").onclick = async () => {
+    if(!await confirmar("¿Enviar recordatorio ahora?","A cada dirigente que debe le llega un mail con su estado de cuenta. Además, esto sale solo los días 1 y 16 de cada mes.","Enviar","")) return;
+    ocupado($("btnRecordar"), async ()=>{ try{ const r = await rpc("enviar_recordatorios_ahora",{p_codigo:S.codigo}); toast(`Se están enviando ${r.encolados} recordatorios`); }catch(er){ toast(er.message) } });
+  };
+  if($("btnHist")) $("btnHist").onclick = () => ocupado($("btnHist"), async ()=>{
+    try{ const ns = await rpc("notificaciones_recientes",{p_codigo:S.codigo}); const box=$("histMails"); box.hidden=false;
+      const est = {enviado:'<span class="pill ok">Enviado</span>', pendiente:'<span class="pill warn">Enviando</span>', error:'<span class="pill bad">Error</span>', sin_mail:'<span class="pill off">Sin mail</span>'};
+      const tipo = {recibo:"Recibo", recordatorio:"Recordatorio", prueba:"Prueba"};
+      box.innerHTML = ns.length ? ns.map(n=>`<div class="item"><div class="ic">${I("mail")}</div><div class="l"><div class="t">${tipo[n.tipo]} · ${esc(n.miembro||n.destino||"")}</div>
+        <div class="muted small">${n.fecha}${n.destino?` · ${esc(n.destino)}`:""}${n.detalle?` · ${esc(n.detalle)}`:""}</div></div>${est[n.estado]}</div>`).join("") : `<div class="muted small">Todavía no se envió ningún mail.</div>`;
+    }catch(er){ toast(er.message) } });
+  if($("btnTraspaso")) $("btnTraspaso").onclick = async () => {
+    const sel = $("nuevoGuia"); if(!sel.value){ toast("Primero creá o elegí otro tesorero"); return; }
+    const nombre = sel.selectedOptions[0].textContent;
+    if(!await confirmar(`¿Pasarle el rol de guía a ${nombre}?`, `${esc(nombre)} va a poder ver y gestionar todo. Vos vas a quedar como tesorero común y ya no vas a ver la gestión. No se puede deshacer desde tu cuenta.`, "Pasar el rol")) return;
+    ocupado($("btnTraspaso"), async ()=>{
+      try{ const r = await rpc("traspasar_guia",{p_codigo:S.codigo,p_nuevo:Number(sel.value)});
+        const link = linkPersonal(r.codigo);
+        const msg = `Hola ${primer(r.nuevo_guia)}, desde ahora sos el guía del área en la app de aportes. Tu acceso (no lo compartas):\n${link}`;
+        await recargar(); S.tab="inicio"; render();
+        abrirHoja(`<div class="estado ok">${I("check")}<span>${esc(r.nuevo_guia)} es el nuevo guía</span></div>
+          <div class="muted small">Mandale su acceso. Desde su cuenta va a ver la pestaña Gestión.</div>
+          <div class="receipt" style="word-break:break-all">${esc(link)}</div>
+          ${r.celular?`<a class="btn wa" target="_blank" rel="noopener" href="${waLink(r.celular,msg)}">${I("msg")} Enviar por WhatsApp</a>`:""}
+          <button class="btn ghost" data-cerrar>Cerrar</button>`);
+      }catch(er){ toast(er.message) }
+    });
+  };
+}
+async function abrirDetalle(b){
+  const det = b.parentElement.querySelector("[data-det]");
+  if(!det.hidden){ det.hidden = true; b.setAttribute("aria-expanded","false"); return; }
+  det.hidden = false; b.setAttribute("aria-expanded","true");
+  det.innerHTML = `<div class="muted small">Cargando…</div>`;
+  try{
+    const c = await rpc("cuenta_de",{p_codigo:S.codigo,p_miembro:Number(b.dataset.mem)});
+    det.innerHTML = `
+      ${aporteHTML(c.aporte, false)}
+      <h3>Por concepto · debe hoy <span class="debt num">${fmt(c.saldo)}</span></h3>
+      <div class="list">${conceptosHTML(c.conceptos)}</div>
+      <h3>Historial de pagos</h3>
+      <div class="list">${pagosHTML(c.pagos, true)}</div>
+      <div class="actions"><button class="btn soft sm" data-link-det>${I("msg","sm")} Enviarle su link</button></div>`;
+    det.querySelector("[data-link-det]").onclick = (ev) => { ev.stopPropagation();
+      const link = linkPersonal(c.miembro.codigo);
+      const msg = `Hola ${primer(c.miembro.nombre)}, este es tu link personal para ver tu cuenta de aportes y subir comprobantes. No lo compartas:\n${link}`;
+      abrirHoja(`<h2>Link de ${esc(c.miembro.nombre)}</h2><div class="receipt" style="word-break:break-all">${esc(link)}</div>
+        <div class="actions">${c.miembro.celular?`<a class="btn wa" target="_blank" rel="noopener" href="${waLink(c.miembro.celular,msg)}">${I("msg")} Enviar por WhatsApp</a>`:""}<button class="btn soft" data-cerrar>Cerrar</button></div>`);
+    };
+  }catch(err){ det.innerHTML = `<div class="err">${esc(err.message)}</div>`; }
+}
+
+// ===== Inicio =====
+$("btnEntrar").onclick = ()=>{ const c=$("inCodigo").value.trim(); if(c){ $("loginErr").hidden=true; entrar(c); } };
+$("inCodigo").onkeydown = e => { if(e.key==="Enter") $("btnEntrar").click(); };
+const desdeLink = new URLSearchParams(location.search).get("c");
+const inicial = desdeLink || read("aportes_codigo");
+if(inicial) entrar(inicial); else mostrar("vLogin");
+</script>
+</body>
+</html>
