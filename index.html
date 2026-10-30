@@ -325,10 +325,11 @@ async function recargar(){
 }
 async function cargarExtras(){
   if(S.data.tipo==="miembro") return;
-  const tareas = [rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>S.gastos=r).catch(()=>S.gastos=[])];
+  const tareas = [rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.tipo==="guia"){
     tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
     tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
+    tareas.push(rpc("permisos_gasto",{p_codigo:S.codigo}).then(r=>S.permGasto=r||[]).catch(()=>S.permGasto=[]));
     tareas.push(rpc("guia_mails_estado",{p_codigo:S.codigo}).then(r=>S.mails=!!r).catch(()=>S.mails=false));
   }
   await Promise.all(tareas);
@@ -352,7 +353,8 @@ function render(){
   mostrar("vMain");
   const m = $("vMain");
   if(S.data.tipo==="miembro"){ m.innerHTML = vistaMiembro(); montarMiembro(); return; }
-  const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"],["gastos","Gastos","receipt"]];
+  const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
+  if(S.gastos) tabs.push(["gastos","Gastos","receipt"]);
   if(S.data.tipo==="guia") tabs.push(["gestion","Gestión","sliders"],["reportes","Reportes","chart"]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
   const pend = S.data.pendientes.length;
@@ -559,12 +561,13 @@ function tabGestion(){
     <div class="row"><h2>${I("award")} Tesoreros</h2><button class="btn sm" data-nuevo-tes>${I("plus","sm")} Nuevo</button></div>
     <div class="list">${tes.map(t=>`
       <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm ${t.rol==="guia"?"sun":""}">${esc(ini(t.nombre))}</div>
-        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
+        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
         <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}</div></div>
         <div class="actions" style="width:100%">
           ${t.activo?`<button class="btn soft sm" data-asig="${t.id}">${I("users","sm")} Dirigentes a cargo</button>
           <button class="btn soft sm" data-link-tes="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
           <button class="btn ghost sm" data-edit-tes="${t.id}">${I("edit","sm")} Editar</button>
+          ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-gasto-perm="${t.id}" data-tiene="${(S.permGasto||[]).includes(t.id)}">${I("receipt","sm")} ${(S.permGasto||[]).includes(t.id)?"Quitar permiso de gastos":"Permitir cargar gastos"}</button>`:""}
           ${t.rol!=="guia"?`<button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Dar de baja":"Reactivar"}</button>`:""}
         </div></div>`).join("")}</div>
   </div>`;
@@ -701,17 +704,17 @@ function tabGastos(){
   const total = gs.reduce((s,g)=>s+Number(g.monto),0);
   return `
   <div class="hero">
-    <div class="lbl">${S.data.tipo==="guia"?"Gastos cargados por toda la tesorería":"Gastos que cargaste"}</div>
+    <div class="lbl">Gastos de la tesorería</div>
     <div class="big num">${fmt(total)}</div>
-    <button class="btn block" data-nuevo-gasto>${I("plus")} Cargar un gasto</button>
+    ${S.puedeGastar?`<button class="btn block" data-nuevo-gasto>${I("plus")} Cargar un gasto</button>`:`<span class="chip">${I("receipt","sm")} Solo lectura: los gastos los cargan las personas habilitadas por el guía</span>`}
   </div>
   <div class="card"><h2>${I("receipt")} Gastos</h2><div class="list">${gs.length ? gs.map(g=>`
     <div class="item" style="flex-wrap:wrap"><div class="ic bad">${I("receipt")}</div>
       <div class="l"><div class="t">${esc(g.descripcion)}</div>
-      <div class="muted small">${g.fecha} · ${esc(g.categoria)} · ${g.evento?esc(g.evento):"Gasto general"} · ${g.medio}${S.data.tipo==="guia"&&g.cargado_por?` · ${esc(g.cargado_por)}`:""}</div></div>
+      <div class="muted small">${g.fecha} · ${esc(g.categoria)} · ${g.evento?esc(g.evento):"Gasto general"} · ${g.medio}${g.cargado_por?` · cargó ${esc(g.cargado_por)}`:""}</div></div>
       <div class="num debt">${fmt(g.monto)}</div>
       <div class="actions" style="width:100%">
-        ${g.tiene_comprobante?`<button class="btn ghost sm" data-ver-gasto="${g.id}">${I("file","sm")} Ver factura</button>`:`<button class="btn ghost sm" data-adjuntar-gasto="${g.id}">${I("upload","sm")} Adjuntar factura</button>`}
+        ${g.tiene_comprobante?`<button class="btn ghost sm" data-ver-gasto="${g.id}">${I("file","sm")} Ver factura</button>`:(g.puede_anular?`<button class="btn ghost sm" data-adjuntar-gasto="${g.id}">${I("upload","sm")} Adjuntar factura</button>`:`<span class="muted tiny" style="align-self:center">Sin factura</span>`)}
         ${g.puede_anular?`<button class="btn ghost sm" data-anular-gasto="${g.id}">${I("x","sm")} Anular</button>`:""}
       </div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("receipt")}</div>Todavía no hay gastos cargados.</div>`}</div></div>`;
@@ -974,6 +977,9 @@ function montarTesorero(){
     if(ds.bajaTes){ const t=P.tesoreros.find(x=>x.id==ds.bajaTes), act = ds.activo==="true";
       if(act && !await confirmar(`¿Dar de baja a ${t.nombre}?`, `Su código deja de funcionar y sus ${t.miembros} dirigentes quedan sin tesorero hasta que los asignes a otro.`, "Dar de baja")) return;
       return ocupado(b, async()=>{ try{ const r=await rpc("set_tesorero_activo",{p_codigo:S.codigo,p_id:t.id,p_activo:!act}); await recargar(); toast(act?`Dado de baja. ${r.liberados} dirigentes quedaron sin tesorero.`:"Reactivado"); }catch(er){ toast(er.message) } }); }
+    if(ds.gastoPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.gastoPerm);
+      if(!tiene && !await confirmar(`¿Permitir que ${t.nombre} cargue gastos?`, "Va a poder cargar gastos y anular los que cargue. Los demás tesoreros los ven, pero no pueden cargar.", "Permitir", "")) return;
+      return ocupado(b, async()=>{ try{ await rpc("set_puede_gastar",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede cargar gastos`); }catch(er){ toast(er.message) } }); }
     if(ds.nuevoMem!==undefined) return hojaMiembro(null);
     if(ds.editMem) return hojaMiembro(P.miembros.find(x=>x.id==ds.editMem));
     if(ds.linkMem){ const x=P.miembros.find(y=>y.id==ds.linkMem); return hojaLink(x.nombre,x.celular,x.codigo,false); }
