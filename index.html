@@ -311,7 +311,7 @@ function confirmar(titulo, texto, boton, cls="bad"){
 }
 
 // ===== Estado =====
-const S = { codigo:null, data:null, panel:null, caja:null, mails:false, asis:null, reus:null, permAsis:[], mtab:"aportes", gastos:null, token:null, tab:"inicio", filtro:"todos", busca:"", sub:"tesoreros" };
+const S = { codigo:null, data:null, panel:null, caja:null, mails:false, kiosco:null, permKiosco:[], caja2:"gastos", asis:null, reus:null, permAsis:[], mtab:"aportes", gastos:null, token:null, tab:"inicio", filtro:"todos", busca:"", sub:"tesoreros" };
 
 async function entrar(cod){
   mostrar("vCargando");
@@ -335,11 +335,14 @@ async function recargar(){
 }
 async function cargarExtras(){
   if(S.data.tipo==="miembro"){ S.asis = await rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null); return; }
-  const tareas = [rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
+  if(S.data.tipo==="autoridad"){ S.reus = await rpc("reuniones_lista",{p_codigo:S.codigo}).catch(()=>null); S.gastos=null; S.kiosco=null; return; }
+  const tareas = [rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
+    rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.tipo==="guia"){
     tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
     tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
     tareas.push(rpc("permisos_asistencia",{p_codigo:S.codigo}).then(r=>S.permAsis=r||[]).catch(()=>S.permAsis=[]));
+    tareas.push(rpc("permisos_kiosco",{p_codigo:S.codigo}).then(r=>S.permKiosco=r||[]).catch(()=>S.permKiosco=[]));
     tareas.push(rpc("permisos_gasto",{p_codigo:S.codigo}).then(r=>S.permGasto=r||[]).catch(()=>S.permGasto=[]));
     tareas.push(rpc("guia_mails_estado",{p_codigo:S.codigo}).then(r=>S.mails=!!r).catch(()=>S.mails=false));
   }
@@ -367,24 +370,27 @@ function render(){
     $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
     m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : vistaMiembro(); montarMiembro(); return; }
   const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
-  if(S.gastos) tabs.push(["gastos","Gastos","receipt"]);
+  if(S.gastos || S.kiosco) tabs.push(["caja","Caja","receipt"]);
   if(S.reus) tabs.push(["asistencia","Asistencia","check"]);
+  if(S.data.tipo==="autoridad"){ tabs.length = 0; tabs.push(["asistencia","Asistencia","check"]); }
   if(S.data.tipo==="guia") tabs.push(["gestion","Gestión","sliders"],["reportes","Reportes","chart"]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
-  const pend = S.data.pendientes.length;
-  $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""}>${I(ic)}<span>${t}</span>${id==="inicio"&&pend?`<span class="badge">${pend}</span>`:""}</button>`).join("");
+  if(S.tab==="gastos") S.tab = "caja";
+  const pend = S.data.pendientes.length, pendK = S.kiosco?.pendientes?.length||0;
+  $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""}>${I(ic)}<span>${t}</span>${id==="inicio"&&pend?`<span class="badge">${pend}</span>`:""}${id==="caja"&&pendK?`<span class="badge">${pendK}</span>`:""}</button>`).join("");
   const t = S.data.tesorero;
-  const sub = S.data.tipo==="guia" ? `Guía del área · ${S.data.parroquia}` : `Tesorero · ${S.data.miembros.length} dirigentes a cargo`;
+  const sub = S.data.tipo==="guia" ? `Guía del área · ${S.data.parroquia}` : S.data.tipo==="autoridad" ? `Autoridad · asistencia de los dirigentes` : `Tesorero · ${S.data.miembros.length} dirigentes a cargo`;
+  if(S.data.tipo==="autoridad") S.tab = "asistencia";
   let body = "";
   if(S.tab==="inicio") body = tabInicio();
   if(S.tab==="dirigentes") body = tabDirigentes();
   if(S.tab==="cobrar") body = tabCobrar();
   if(S.tab==="gestion") body = tabGestion();
   if(S.tab==="reportes") body = tabReportes();
-  if(S.tab==="gastos") body = tabGastos();
+  if(S.tab==="caja") body = tabCaja();
   if(S.tab==="asistencia") body = tabAsistencia();
   m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
-  montarTesorero(); montarExtras(); montarAsistencia();
+  montarTesorero(); montarExtras(); montarAsistencia(); montarCaja();
 }
 $("tabsIn").onclick = e => {
   const mb=e.target.closest("[data-mtab]"); if(mb){ S.mtab=mb.dataset.mtab; store("aportes_mtab",S.mtab); render(); scrollTo({top:0}); return; }
@@ -392,10 +398,10 @@ $("tabsIn").onclick = e => {
 
 // ===== Aporte anual =====
 function estadoAporte(a){
-  if(a.meses_vencidos===0) return {cls:"neutral", ic:"clock", txt:`Las cuotas empiezan en ${a.mes_desde}.`};
+  if(a.meses_vencidos===0) return {cls:"neutral", ic:"clock", txt:`Los aportes empiezan en ${a.mes_desde}.`};
   if(a.falta_anio<=0) return {cls:"ok", ic:"award", txt:"¡Año cancelado! Gracias."};
   if(a.al_dia) return {cls:"ok", ic:"check", txt: a.adelantado>0 ? `Al día a ${a.mes_actual}, con ${fmt(a.adelantado)} adelantado.` : `Al día a ${a.mes_actual}.`};
-  return {cls:"bad", ic:"alert", txt:`Debe ${a.cuotas_atrasadas} ${a.cuotas_atrasadas===1?"cuota":"cuotas"} (${fmt(a.atraso)}) a ${a.mes_actual}.`};
+  return {cls:"bad", ic:"alert", txt:`Debe ${a.cuotas_atrasadas} ${a.cuotas_atrasadas===1?"aporte":"aportes"} (${fmt(a.atraso)}) a ${a.mes_actual}.`};
 }
 function aporteHTML(a, propio){
   const n = a.meses_total, inicio = MES_N[a.mes_desde] || 3;
@@ -415,7 +421,7 @@ function aporteHTML(a, propio){
       <div class="stat"><span class="muted tiny">Falta para cancelar el año</span><b class="${a.falta_anio>0?"debt":"paid"}">${a.falta_anio>0?fmt(a.falta_anio):"Nada"}</b></div>
     </div>
     ${a.credito_eventos>0?`<div class="estado neutral">${I("gift")}<span>${fmt(a.credito_eventos)} de lo pagado ${propio?"viene de tus ventas":"viene de sus ventas"} de eventos (bonos, etc.)</span></div>`:""}
-    ${a.meses_vencidos>0?`<div class="muted small">A ${a.mes_actual} ${propio?"deberías":"debería"} llevar ${fmt(a.debido_a_hoy)} (${a.meses_vencidos} de ${n} cuotas de ${fmt(a.mensual)}). Las cuotas van de ${a.mes_desde} a ${a.mes_hasta}.</div>`:""}`;
+    ${a.meses_vencidos>0?`<div class="muted small">A ${a.mes_actual} ${propio?"deberías":"debería"} llevar ${fmt(a.debido_a_hoy)} (${a.meses_vencidos} de ${n} aportes de ${fmt(a.mensual)}). Los aportes van de ${a.mes_desde} a ${a.mes_hasta}.</div>`:""}`;
 }
 const pctTxt = n => (Math.round(Number(n)*100)/100).toLocaleString("es-AR") + "%";
 function icConcepto(nombre){
@@ -426,7 +432,7 @@ function icConcepto(nombre){
 function conceptosHTML(cs){
   return cs.map(r=>{ const [ic,c]=icConcepto(r.nombre); return `
     <div class="item"><div class="ic ${c}">${I(ic)}</div><div class="l"><div class="t">${esc(r.nombre)}</div>
-      <div class="muted small">${r.evento_id===null?`${r.cantidad} cuotas vencidas`:`${plural(r.cantidad,r)} × ${fmt(r.precio)}${r.pct_aporte>0?` · ${pctTxt(r.pct_aporte)} va al aporte`:""}`} · pagado ${fmt(r.pagado)}${r.de_eventos>0?` (${fmt(r.de_eventos)} de eventos)`:""}${r.pendiente>0?` · ${fmt(r.pendiente)} en revisión`:""}</div></div>
+      <div class="muted small">${r.evento_id===null?`${r.cantidad} ${r.cantidad===1?"aporte vencido":"aportes vencidos"}`:`${plural(r.cantidad,r)} × ${fmt(r.precio)}${r.pct_aporte>0?` · ${pctTxt(r.pct_aporte)} va al aporte`:""}`} · pagado ${fmt(r.pagado)}${r.de_eventos>0?` (${fmt(r.de_eventos)} de eventos)`:""}${r.pendiente>0?` · ${fmt(r.pendiente)} en revisión`:""}</div></div>
       <div class="num ${r.saldo>0?"debt":"paid"}">${r.saldo>0?fmt(r.saldo):(r.a_favor>0?`+${fmt(r.a_favor)}`:I("check"))}</div></div>`}).join("");
 }
 function pillEstado(e){return e==="verificado"?`<span class="pill ok">${I("check","sm")}Verificado</span>`:e==="pendiente"?`<span class="pill warn">${I("clock","sm")}En revisión</span>`:`<span class="pill bad">${I("x","sm")}Rechazado</span>`}
@@ -446,6 +452,7 @@ function vistaMiembro(){
   const d = S.data, c = d.cuenta, m = c.miembro;
   const chip = c.saldo<=0 ? `<span class="chip ok">${I("check","sm")} Estás al día</span>` : `<span class="chip">${I("clock","sm")} Saldo pendiente</span>`;
   return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
+  ${S.asis?alertaRacha(S.asis.racha, true):""}
   <div class="hero">
     <div class="lbl">Lo que debés hoy</div>
     <div class="big num">${fmt(c.saldo)}</div>
@@ -511,7 +518,7 @@ function tabInicio(){
   const total = d.miembros.reduce((s,m)=>s+Number(m.saldo),0);
   const atr = d.miembros.filter(m=>!m.aporte.al_dia).length;
   const pend = d.pendientes;
-  return `
+  return `${alertasHTML()}
   <div class="hero">
     <div class="lbl">${d.tipo==="guia"?"Deuda de todos los dirigentes hoy":"Deuda de tus dirigentes hoy"}</div>
     <div class="big num">${fmt(total)}</div>
@@ -576,7 +583,8 @@ function tabCobrar(){
 // ===== Gestión (solo guía) =====
 function tabGestion(){
   const p = S.panel; if(!p) return `<div class="card">No se pudo cargar la gestión.</div>`;
-  const tes = p.tesoreros, act = tes.filter(t=>t.activo);
+  const auts = p.tesoreros.filter(t=>t.rol==="autoridad");
+  const tes = p.tesoreros.filter(t=>t.rol!=="autoridad"), act = tes.filter(t=>t.activo);
   const nomTes = id => (tes.find(t=>t.id===id)||{}).nombre;
   const sinTes = p.miembros.filter(m=>m.activo && !m.tesorero_id).length;
   const sec = {};
@@ -585,13 +593,14 @@ function tabGestion(){
     <div class="row"><h2>${I("award")} Tesoreros</h2><button class="btn sm" data-nuevo-tes>${I("plus","sm")} Nuevo</button></div>
     <div class="list">${tes.map(t=>`
       <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm ${t.rol==="guia"?"sun":""}">${esc(ini(t.nombre))}</div>
-        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.rol!=="guia"&&(S.permAsis||[]).includes(t.id)?` <span class="pill ok">${I("check","sm")}Toma asistencia</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
+        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.rol!=="guia"&&(S.permAsis||[]).includes(t.id)?` <span class="pill ok">${I("check","sm")}Toma asistencia</span>`:""}${t.rol!=="guia"&&(S.permKiosco||[]).includes(t.id)?` <span class="pill neutral">${I("cash","sm")}Kiosco</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
         <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}</div></div>
         <div class="actions" style="width:100%">
           ${t.activo?`<button class="btn soft sm" data-asig="${t.id}">${I("users","sm")} Dirigentes a cargo</button>
           <button class="btn soft sm" data-link-tes="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
           <button class="btn ghost sm" data-edit-tes="${t.id}">${I("edit","sm")} Editar</button>
           ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-asis-perm="${t.id}" data-tiene="${(S.permAsis||[]).includes(t.id)}">${I("check","sm")} ${(S.permAsis||[]).includes(t.id)?"Quitar permiso de asistencia":"Permitir tomar asistencia"}</button>`:""}
+          ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-kiosco-perm="${t.id}" data-tiene="${(S.permKiosco||[]).includes(t.id)}">${I("cash","sm")} ${(S.permKiosco||[]).includes(t.id)?"Quitar permiso del kiosco":"Permitir manejar el kiosco"}</button>`:""}
           ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-gasto-perm="${t.id}" data-tiene="${(S.permGasto||[]).includes(t.id)}">${I("receipt","sm")} ${(S.permGasto||[]).includes(t.id)?"Quitar permiso de gastos":"Permitir cargar gastos"}</button>`:""}
           ${t.rol!=="guia"?`<button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Dar de baja":"Reactivar"}</button>`:""}
         </div></div>`).join("")}</div>
@@ -638,7 +647,7 @@ function tabGestion(){
   <div class="card">
     <h2>${I("award")} Dejar de ser guía</h2>
     <div class="muted small">Pasale el rol de guía a otro tesorero. Esa persona va a poder ver y gestionar todo, y vos quedás como tesorero común (después te puede dar de baja).</div>
-    <label>Nuevo guía<select id="nuevoGuia">${act.filter(t=>!t.es_vos).map(t=>`<option value="${t.id}">${esc(t.nombre)}</option>`).join("")}</select></label>
+    <label>Nuevo guía<select id="nuevoGuia">${act.filter(t=>!t.es_vos && t.rol==="tesorero").map(t=>`<option value="${t.id}">${esc(t.nombre)}</option>`).join("")}</select></label>
     <button class="btn bad block" id="btnTraspaso">${I("award")} Pasar el rol de guía</button>
   </div>`;
   sec.ajustes = `
@@ -664,14 +673,25 @@ function tabGestion(){
     <button class="btn block" id="copiarScript">${I("copy")} Copiar código</button>
     <div class="muted tiny">El código tiene una clave de solo lectura: sirve para leer el libro, no para modificar nada. No lo compartas fuera de la tesorería.</div>`:`<div class="muted small">Cargando código…</div>`}
   </div>`;
-  const subs = [["tesoreros","Tesoreros"],["dirigentes","Dirigentes"],["eventos","Eventos"],["mails","Mails"],["drive","Libro en Drive"],["ajustes","Ajustes"],["traspaso","Traspaso"]];
+  sec.autoridades = `
+  <div class="card">
+    <div class="row"><h2>${I("award")} Autoridades</h2><button class="btn sm" data-nueva-aut>${I("plus","sm")} Nueva</button></div>
+    <div class="muted small">Ven solo la asistencia de los dirigentes (reuniones, historial, alertas y Excel). No ven nada de plata ni pueden tomar asistencia.</div>
+    <div class="list">${auts.length ? auts.map(t=>`
+      <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm">${esc(ini(t.nombre))}</div>
+        <div class="l"><div class="t">${esc(t.nombre)}${t.activo?"":` <span class="pill off">De baja</span>`}</div><div class="muted small">${esc(t.celular||"Sin celular")}</div></div>
+        <div class="actions" style="width:100%">${t.activo?`<button class="btn soft sm" data-link-aut="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
+          <button class="btn ghost sm" data-edit-aut="${t.id}">${I("edit","sm")} Editar</button>
+          <button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Quitar acceso":"Devolver acceso"}</button></div></div>`).join("")
+      : `<div class="empty"><div class="ic">${I("award")}</div>Todavía no hay autoridades con acceso.</div>`}</div></div>`;
+  const subs = [["tesoreros","Tesoreros"],["autoridades","Autoridades"],["dirigentes","Dirigentes"],["eventos","Eventos"],["mails","Mails"],["drive","Libro en Drive"],["ajustes","Ajustes"],["traspaso","Traspaso"]];
   if(!sec[S.sub]) S.sub = "tesoreros";
   return `<div class="filters" style="position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0">${subs.map(([id,t])=>`<button data-sub="${id}" aria-pressed="${S.sub===id}">${t}</button>`).join("")}</div>` + sec[S.sub];
 }
 function tabReportes(){
   const p = S.panel, c = S.caja; if(!p || !c) return `<div class="card">No se pudo cargar.</div>`;
   const r = p.reportes;
-  const tes = p.tesoreros.filter(t=>t.activo && (t.rol!=="guia" || t.miembros>0 || t.efectivo>0));
+  const tes = p.tesoreros.filter(t=>t.activo && t.rol!=="autoridad" && (t.rol!=="guia" || t.miembros>0 || t.efectivo>0));
   const pct = (a,b)=> b>0 ? Math.min(100, Math.round(a/b*100)) : 0;
   const saldo = c.ingresos - c.egresos;
   const evs = c.eventos.filter(e=>e.vendido>0 || e.gastos>0);
@@ -699,18 +719,26 @@ function tabReportes(){
         <div class="stat"><span class="muted tiny">Cobrado</span><b class="paid">${fmt(e.cobrado)}</b></div>
         <div class="stat"><span class="muted tiny">Gastos</span><b class="debt">${fmt(e.gastos)}</b></div>
       </div>
-      ${e.a_aportes>0||pa>0?`<div class="estado neutral small">${I("heart","sm")}<span>${pctTxt(pa)} va al aporte de cada dirigente: ${fmt(e.a_aportes)} ya se descontaron de sus cuotas y no cuentan como ganancia del evento.</span></div>`:""}
+      ${e.a_aportes>0||pa>0?`<div class="estado neutral small">${I("heart","sm")}<span>${pctTxt(pa)} va al aporte de cada dirigente: ${fmt(e.a_aportes)} ya se sumaron a sus aportes y no cuentan como ganancia del evento.</span></div>`:""}
       <div class="prog"><span style="width:${pct(e.cobrado, e.vendido)}%"></span></div>
       <div class="muted small">${e.vendido>e.cobrado?`Falta cobrar ${fmt(e.vendido-e.cobrado)}. Si se cobra todo, el resultado sería ${proy>=0?"ganancia":"pérdida"} de ${fmt(Math.abs(proy))}.`:"Cobrado completo."}
         ${e.gastos_detalle.length?`<br>Gastos: ${e.gastos_detalle.map(g=>`${esc(g.categoria)} ${fmt(g.monto)}`).join(" · ")}`:""}</div>
     </div>`}).join("") : `<div class="muted small">Todavía no hay eventos con ventas o gastos.</div>`}
     ${c.egresos_generales>0?`<div class="muted small">Además hay ${fmt(c.egresos_generales)} en gastos generales (no asignados a un evento).</div>`:""}
   </div>
+  <div class="card"><h2>${I("file")} Exportar</h2>
+    <div class="muted small">Descargá un Excel con el estado de cada dirigente y todos los pagos aprobados.</div>
+    <button class="btn block" data-excel-aportes>${I("file")} Descargar Excel de aportes</button>
+    ${S.reus?`<button class="btn soft block" data-excel-asis>${I("file")} Descargar Excel de asistencia</button>`:""}</div>
+  ${c.kiosco_ventas>0||c.kiosco_compras>0?`<div class="card"><h2>${I("cash")} Kiosco</h2>
+    <div class="stats"><div class="stat"><span class="muted tiny">Ventas</span><b class="paid">${fmt(c.kiosco_ventas)}</b></div>
+    <div class="stat"><span class="muted tiny">Compras</span><b class="debt">${fmt(c.kiosco_compras)}</b></div>
+    <div class="stat"><span class="muted tiny">${c.kiosco_ventas>=c.kiosco_compras?"Ganancia":"Pérdida"}</span><b class="${c.kiosco_ventas>=c.kiosco_compras?"paid":"debt"}">${fmt(Math.abs(c.kiosco_ventas-c.kiosco_compras))}</b></div></div></div>`:""}
   <div class="card"><h2>${I("heart")} Aporte anual</h2>
     <div class="row small"><span class="muted">Cobrado ${fmt(apCob)} de ${fmt(r.aporte_comprometido)}</span><b>${pct(apCob, r.aporte_comprometido)}%</b></div>
     <div class="prog"><span style="width:${pct(apCob, r.aporte_comprometido)}%"></span></div>
     ${apCred>0?`<div class="muted small">Incluye ${fmt(apCred)} que vienen de ventas de eventos.</div>`:""}
-    <div class="muted small">Falta cobrar ${fmt(r.aporte_falta_anio)} para cerrar el año. Van ${r.meses_vencidos} de ${r.cantidad_meses} cuotas.</div></div>
+    <div class="muted small">Falta cobrar ${fmt(r.aporte_falta_anio)} para cerrar el año. Van ${r.meses_vencidos} de ${r.cantidad_meses} aportes mensuales.</div></div>
   <div class="card"><h2>${I("book")} Libro diario</h2>
     <div class="muted small">Últimos movimientos. El libro completo está en la planilla de Drive (Gestión → Libro en Drive).</div>
     <div class="list">${c.libro.slice(0,30).map(l=>`
@@ -728,76 +756,157 @@ function tabReportes(){
     <div class="stat"><span class="muted tiny">Debería haber en efectivo</span><b>${fmt(c.ingresos_efectivo - c.egresos_efectivo)}</b></div></div></div>`;
 }
 
+// ===== Excel =====
+async function cargarXLSX(){
+  if(window.XLSX) return;
+  await new Promise((res, rej)=>{ const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload=res; sc.onerror=()=>rej(new Error("No se pudo cargar el generador de Excel. Revisá tu internet.")); document.head.appendChild(sc); });
+}
+function hojaXLSX(filas, anchos){ const ws = XLSX.utils.aoa_to_sheet(filas); if(anchos) ws["!cols"] = anchos.map(w=>({wch:w})); return ws; }
+const fechaArchivo = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const nro = v => Math.round(Number(v)||0);
+async function exportarAsistencia(){
+  try{
+    await cargarXLSX();
+    const d = await rpc("export_asistencia",{p_codigo:S.codigo});
+    const L = {presente:"P", tarde:"T", servicio:"S", ausente:"A", no_corresponde:"—"};
+    const cab = ["Dirigente","Tesorero", ...d.reuniones.map(r=>`${r.fecha.slice(0,5)} ${r.nombre}`), "Presentes","Tardes","Servicio","Faltas","% asistencia","Faltas seguidas"];
+    const filas = [[`Asistencia · ${d.parroquia}`],[`Generado el ${d.generado}. P = presente, T = tarde, S = servicio, A = ausente, — = todavía no era dirigente. El % no cuenta los servicios.`],[], cab];
+    d.dirigentes.forEach(x=>{ const r = x.resumen, base = r.total - r.servicio;
+      filas.push([x.nombre, x.tesorero||"", ...d.reuniones.map(re=>L[x.estados[String(re.id)]]||""), r.presentes, r.tardes, r.servicio, r.ausentes, base>0?Math.round(r.presentes/base*100)/100:"", r.racha]); });
+    const ws = hojaXLSX(filas, [24,18, ...d.reuniones.map(()=>14), 10,8,9,8,12,14]);
+    const colPct = XLSX.utils.encode_col(2 + d.reuniones.length + 4);
+    for(let i=5;i<=filas.length;i++){ const c = ws[`${colPct}${i}`]; if(c && typeof c.v==="number") c.z = "0%"; }
+    const ws2 = hojaXLSX([["Fecha","Reunión o evento","Tipo"], ...d.reuniones.map(r=>[r.fecha, r.nombre, r.tipo])], [12,34,22]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Asistencia"); XLSX.utils.book_append_sheet(wb, ws2, "Reuniones");
+    XLSX.writeFile(wb, `Asistencia ${fechaArchivo()}.xlsx`);
+    toast("Excel descargado");
+  }catch(e){ toast(e.message); }
+}
+async function exportarAportes(){
+  try{
+    await cargarXLSX();
+    const d = await rpc("export_aportes",{p_codigo:S.codigo});
+    const evs = [...new Set(d.dirigentes.flatMap(x=>x.cuenta.conceptos.filter(c=>c.evento_id!==null).map(c=>c.nombre)))];
+    const cab = ["Dirigente","Tesorero","Celular","Mail","Aporte mensual","Compromiso del año","Debería llevar a hoy","Pagado al aporte","De eventos","Falta para el año","Atraso","Estado", ...evs.map(e=>`Debe: ${e}`), "Deuda total hoy"];
+    const filas = [[`Aportes · ${d.parroquia}`],[`Generado el ${d.generado}`],[], cab];
+    d.dirigentes.forEach(x=>{ const c = x.cuenta, a = c.aporte;
+      filas.push([x.nombre, x.tesorero||"", x.celular||"", x.email||"", nro(a.mensual), nro(a.anual), nro(a.debido_a_hoy), nro(a.pagado), nro(a.credito_eventos), nro(a.falta_anio), nro(a.atraso),
+        a.al_dia?"Al día":`Debe ${a.cuotas_atrasadas} ${a.cuotas_atrasadas===1?"aporte":"aportes"}`,
+        ...evs.map(e=>{ const k = c.conceptos.find(z=>z.nombre===e); return k?nro(k.saldo):0; }), nro(c.saldo)]); });
+    const ws = hojaXLSX(filas, [24,18,14,22,12,14,14,14,11,14,10,16, ...evs.map(()=>16), 14]);
+    const money = new Set([4,5,6,7,8,9,10, ...evs.map((_,i)=>12+i), 12+evs.length]);
+    for(let i=5;i<=filas.length;i++) money.forEach(ci=>{ const cell = ws[`${XLSX.utils.encode_col(ci)}${i}`]; if(cell && typeof cell.v==="number") cell.z = '"$" #,##0'; });
+    const pg = [["Fecha","Recibo","Dirigente","Concepto","Medio","Monto","Suma al aporte"], ...d.pagos.map(p=>[p.fecha, p.recibo, p.dirigente, p.concepto, p.medio, nro(p.monto), nro(p.al_aporte)])];
+    const ws2 = hojaXLSX(pg, [12,9,24,24,14,12,14]);
+    for(let i=2;i<=pg.length;i++) ["F","G"].forEach(col=>{ const cell = ws2[`${col}${i}`]; if(cell) cell.z = '"$" #,##0'; });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Estado por dirigente"); XLSX.utils.book_append_sheet(wb, ws2, "Pagos aprobados");
+    XLSX.writeFile(wb, `Aportes ${fechaArchivo()}.xlsx`);
+    toast("Excel descargado");
+  }catch(e){ toast(e.message); }
+}
+
 // ===== QR =====
 function qrSVG(texto){
   try{ const q = qrcode(0, "M"); q.addData(texto); q.make(); return q.createSvgTag({cellSize:8, margin:2, scalable:true}); }
   catch(_){ return `<div class="muted small" style="color:#333;text-align:center;word-break:break-all">No se pudo dibujar el QR. Código: ${esc(texto)}</div>`; }
 }
 
+// ===== Estados de asistencia =====
+const EST = {presente:["Presente","ok","check"], tarde:["Tarde","warn","clock"], servicio:["Servicio","neutral","heart"], ausente:["Ausente","bad","x"]};
+const pillEst = e => `<span class="pill ${EST[e][1]}">${EST[e][0]}</span>`;
+const pctAsis = a => { const base = a.total - (a.servicio||0); return base>0 ? Math.round(a.presentes/base*100) : null; };
+function alertaRacha(racha, propio){
+  if(racha>=3) return `<div class="estado bad">${I("alert")}<span>${propio?"Llevás":"Lleva"} ${racha} faltas seguidas.${propio?" Hablá con tu guía.":""}</span></div>`;
+  if(racha===2) return `<div class="estado ${propio?"bad":"neutral"}">${I("alert")}<span>${propio?"Atención: llevás 2 faltas seguidas. A la tercera se avisa al guía.":"Lleva 2 faltas seguidas."}</span></div>`;
+  return "";
+}
+function historialAsisHTML(a, propio){
+  const pc = pctAsis(a);
+  return `${alertaRacha(a.racha, propio)}
+    <div class="row"><div><div class="muted small">Asistencia</div><div class="bigpct num">${pc===null?"—":pc+"%"}</div></div>
+      <div style="text-align:right;display:flex;flex-direction:column;gap:2px" class="small">
+        <span><b>${a.presentes}</b> presente${a.presentes===1?"":"s"}${a.tardes?` (${a.tardes} tarde)`:""}</span>
+        <span><b>${a.ausentes}</b> falta${a.ausentes===1?"":"s"}</span>
+        ${a.servicio?`<span><b>${a.servicio}</b> de servicio</span>`:""}</div></div>
+    ${pc!==null?`<div class="prog"><span style="width:${pc}%;${pc<60?"background:var(--bad)":pc<80?"background:var(--sun)":""}"></span></div>`:""}
+    ${a.por_tipo.map(t=>`<div class="row small"><span>${esc(t.tipo)}</span><b class="num">${t.presentes} de ${t.total - (t.servicio||0)}${t.servicio?` <span class="muted">· ${t.servicio} servicio</span>`:""}</b></div>`).join("")}
+    <div class="list">${a.reuniones.length ? a.reuniones.map(r=>`
+      <div class="item"><div class="ic ${EST[r.estado][1]==="warn"?"sun":EST[r.estado][1]==="neutral"?"":EST[r.estado][1]}">${I(EST[r.estado][2])}</div>
+        <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}${r.hora?` · ${r.hora}`:""}</div></div>
+        ${pillEst(r.estado)}</div>`).join("")
+      : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no se tomó asistencia.</div>`}</div>`;
+}
+async function hojaHistorial(mid){
+  try{ const a = await rpc("asistencia_de",{p_codigo:S.codigo,p_miembro:mid});
+    abrirHoja(`<h2>Asistencia de ${esc(a.nombre)}</h2>${historialAsisHTML(a, false)}<button class="btn soft" data-cerrar>Cerrar</button>`);
+  }catch(e){ toast(e.message); }
+}
+
 // ===== Mi asistencia (dirigente) =====
 function vistaMiAsistencia(){
   const d = S.data, a = S.asis, m = d.cuenta.miembro;
   if(!a) return cabecera(m.nombre, `${d.parroquia} · ${d.anio}`) + `<div class="card">No se pudo cargar tu asistencia. Probá de nuevo más tarde.</div>`;
-  const pc = a.total ? Math.round(a.presentes / a.total * 100) : 0;
   return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
+  ${alertaRacha(a.racha, true)}
   <div class="card" style="align-items:center;text-align:center">
     <h2 style="align-self:flex-start">${I("check")} Mi QR de asistencia</h2>
     <div class="qrbox">${qrSVG(a.qr)}</div>
     <div class="muted small">Mostralo cuando llegues a la escuela de dirigentes o a un evento. Subí el brillo de la pantalla si cuesta leerlo.</div>
   </div>
-  <div class="card">
-    <div class="row"><div><div class="muted small">Mi asistencia</div><div class="bigpct num">${a.total?pc+"%":"—"}</div></div>
-      <div style="text-align:right"><div class="t" style="font-weight:800">${a.presentes} de ${a.total}</div><div class="muted small">reuniones y eventos</div></div></div>
-    ${a.total?`<div class="prog"><span style="width:${pc}%"></span></div>`:""}
-    ${a.por_tipo.map(t=>`<div class="row small"><span>${esc(t.tipo)}</span><b class="num">${t.presentes} de ${t.total}</b></div>`).join("")}
-  </div>
-  <div class="card"><h2>${I("clock")} Historial</h2><div class="list">${a.reuniones.length ? a.reuniones.map(r=>`
-    <div class="item"><div class="ic ${r.presente?"ok":"bad"}">${I(r.presente?"check":"x")}</div>
-      <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}${r.hora?` · llegaste ${r.hora}`:""}</div></div>
-      <span class="pill ${r.presente?"ok":"bad"}">${r.presente?"Presente":"Ausente"}</span></div>`).join("")
-    : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no se tomó asistencia.</div>`}</div></div>`;
+  <div class="card"><h2>${I("clock")} Mi asistencia</h2>${historialAsisHTML({...a, racha:0}, true)}</div>`;
 }
 
 // ===== Asistencia (quien la toma) =====
 const TIPOS_REU = ["Escuela de dirigentes","Reunión","Evento","Retiro","Misa"];
 function tabAsistencia(){
   const R = S.reus;
-  const ranking = R.por_dirigente.filter(x=>x.total>0).map(x=>({...x, pc: Math.round(x.presentes/x.total*100)})).sort((a,b)=>a.pc-b.pc||a.nombre.localeCompare(b.nombre));
+  const ranking = R.por_dirigente.filter(x=>x.total>0).map(x=>({...x, pc: pctAsis(x)??100})).sort((a,b)=>b.racha-a.racha||a.pc-b.pc||a.nombre.localeCompare(b.nombre));
   return `
   <div class="hero">
     <div class="lbl">Asistencia</div>
     <div class="big num">${R.reuniones.length}</div>
     <span class="chip">${R.reuniones.length===1?"reunión o evento registrado":"reuniones y eventos registrados"}</span>
-    <button class="btn block" data-nueva-reu>${I("plus")} Nueva reunión o evento</button>
+    ${R.puede_tomar!==false?`<button class="btn block" data-nueva-reu>${I("plus")} Nueva reunión o evento</button>`:""}
+    <button class="btn block" data-excel-asis style="background:rgba(255,255,255,.18);color:#fff">${I("file")} Descargar Excel de asistencia</button>
   </div>
+  ${alertasHTML()}
   <div class="card"><h2>${I("clock")} Reuniones y eventos</h2><div class="list">${R.reuniones.length ? R.reuniones.map(r=>`
     <div class="item" style="flex-wrap:wrap"><div class="ic ok">${I("check")}</div>
-      <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}</div></div>
-      <div style="text-align:right"><div class="num" style="font-weight:900;font-size:1.1rem">${r.presentes}<span class="muted small"> / ${r.esperados}</span></div><div class="muted tiny">presentes</div></div>
-      <div class="actions" style="width:100%"><button class="btn sm" data-escanear="${r.id}">${I("check","sm")} Tomar asistencia</button>
+      <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}${r.hora_inicio?` · ${r.hora_inicio} h`:""}</div></div>
+      <div style="text-align:right"><div class="num" style="font-weight:900;font-size:1.1rem">${r.presentes}<span class="muted small"> / ${r.esperados}</span></div><div class="muted tiny">presentes${r.servicio?` · ${r.servicio} servicio`:""}</div></div>
+      <div class="actions" style="width:100%">${R.puede_tomar!==false?`<button class="btn sm" data-escanear="${r.id}">${I("check","sm")} Tomar asistencia</button>`:""}
         <button class="btn soft sm" data-lista-reu="${r.id}">${I("users","sm")} Ver lista</button>
-        <button class="btn ghost sm" data-anular-reu="${r.id}">${I("x","sm")} Anular</button></div></div>`).join("")
+        ${R.puede_tomar!==false?`<button class="btn ghost sm" data-anular-reu="${r.id}">${I("x","sm")} Anular</button>`:""}</div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("check")}</div>Creá la primera reunión para empezar a tomar asistencia.</div>`}</div></div>
   ${ranking.length?`<div class="card"><h2>${I("users")} Asistencia por dirigente</h2>
-    <div class="muted small">De menor a mayor asistencia.</div>
-    <div class="list">${ranking.map(x=>`<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
-      <div class="row"><span class="t">${esc(x.nombre)}</span><span class="small num"><b class="${x.pc<60?"debt":x.pc<80?"":"paid"}">${x.pc}%</b> <span class="muted">· ${x.presentes} de ${x.total}</span></span></div>
-      <div class="prog"><span style="width:${x.pc}%;${x.pc<60?"background:var(--bad)":x.pc<80?"background:var(--sun)":""}"></span></div></div>`).join("")}</div></div>`:""}`;
+    <div class="muted small">Primero los que tienen faltas seguidas. Tocá un nombre para ver dónde faltó.</div>
+    <div class="list">${ranking.map(x=>`<button class="mem" data-hist="${x.id}" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div class="row"><span class="t" style="font-weight:800">${esc(x.nombre)} ${x.racha>=3?`<span class="pill bad">${x.racha} faltas seguidas</span>`:x.racha===2?`<span class="pill warn">2 seguidas</span>`:""}</span>
+        <span class="small num"><b class="${x.pc<60?"debt":x.pc<80?"":"paid"}">${x.pc}%</b> <span class="muted">· ${x.ausentes} falta${x.ausentes===1?"":"s"}</span></span></div>
+      <div class="prog"><span style="width:${x.pc}%;${x.pc<60?"background:var(--bad)":x.pc<80?"background:var(--sun)":""}"></span></div></button>`).join("")}</div></div>`:""}`;
+}
+function alertasHTML(){
+  const al = S.reus?.alertas || [];
+  if(!al.length) return "";
+  return `<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">${I("alert")} ${al.length===1?"1 dirigente con 3 o más faltas seguidas":al.length+" dirigentes con 3 o más faltas seguidas"}</h2>
+    <div class="list">${al.map(x=>`<button class="mem" data-hist="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
+      <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(x.nombre)}</div><div class="muted small">${x.racha} faltas seguidas · tocá para ver el detalle</div></div>
+      <span class="pill bad">${x.racha}</span></button>`).join("")}</div></div>`;
 }
 function hojaReunion(){
   const tipos = [...new Set([...TIPOS_REU, ...(S.reus?.tipos||[])])];
   abrirHoja(`<h2>Nueva reunión o evento</h2>
     <label>Tipo<select id="rTipo">${tipos.map(t=>`<option>${esc(t)}</option>`).join("")}</select></label>
-    <label>Nombre<input id="rNom" value="Escuela de dirigentes"></label>
-    <label>Fecha<input id="rFecha" type="date" value="${hoyISO()}"></label>
+    <label>Nombre<input id="rNom" placeholder="Ej.: Escuela de dirigentes · Encuentro 12"></label>
+    <div class="grid2"><label>Fecha<input id="rFecha" type="date" value="${hoyISO()}"></label>
+    <label>Hora de inicio (opcional)<input id="rHora" type="time"></label></div>
+    <div class="muted small">Si ponés la hora de inicio, quien escanee el QR más de 10 minutos después queda como "Tarde". Los de servicio los marcás a mano.</div>
     <div class="err" id="rErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="rOk">${I("check")} Crear y tomar asistencia</button></div>`,
   (s, cerrar)=>{
     const tipo = s.querySelector("#rTipo"), nom = s.querySelector("#rNom");
-    tipo.onchange = ()=>{ if(!nom.dataset.tocado) nom.value = tipo.value; };
-    nom.oninput = ()=> nom.dataset.tocado = "1";
     const b = s.querySelector("#rOk"); b.onclick = () => ocupado(b, async()=>{
-      try{ const r = await rpc("crear_reunion",{p_codigo:S.codigo,p_nombre:nom.value,p_tipo:tipo.value,p_fecha:s.querySelector("#rFecha").value||null});
+      try{ const r = await rpc("crear_reunion",{p_codigo:S.codigo,p_nombre:nom.value,p_tipo:tipo.value,p_fecha:s.querySelector("#rFecha").value||null,p_hora:s.querySelector("#rHora").value||null});
         cerrar(); await recargar(); abrirEscaner(r.id);
       }catch(e){ const er=s.querySelector("#rErr"); er.textContent=e.message; er.hidden=false; } });
   });
@@ -848,7 +957,7 @@ function abrirEscaner(rid){
         if(txt && !(txt===ultimo && ahora-ultimoT<3000)){
           ultimo = txt; ultimoT = ahora; ocupadoQR = true;
           try{ const r = await rpc("registrar_qr",{p_codigo:S.codigo,p_reunion:rid,p_qr:txt});
-            pip(true); aviso("ok", `${I("check","sm")} ${esc(r.nombre)} ${r.nuevo?"presente":"ya estaba registrado"}`); cnt.textContent = `${r.presentes} / ${reu.esperados}`;
+            pip(true); aviso(r.estado==="tarde"?"bad":"ok", `${I(r.estado==="tarde"?"clock":"check","sm")} ${esc(r.nombre)} ${r.nuevo?(r.estado==="tarde"?"llegó tarde":"presente"):"ya estaba registrado ("+EST[r.estado][0].toLowerCase()+")"}`); cnt.textContent = `${r.presentes} / ${reu.esperados}`;
           }catch(e){ pip(false); aviso("bad", esc(e.message)); }
           ocupadoQR = false;
         }
@@ -864,22 +973,25 @@ function abrirEscaner(rid){
 async function abrirListaReunion(rid){
   let d;
   try{ d = await rpc("reunion_detalle",{p_codigo:S.codigo,p_reunion:rid}); }catch(e){ toast(e.message); return; }
-  const pres = () => d.dirigentes.filter(x=>x.presente).length;
-  abrirHoja(`<h2>${esc(d.nombre)}</h2><div class="muted small">${d.fecha} · ${esc(d.tipo)} · tocá un nombre para marcarlo presente o ausente.</div>
-    <div class="row"><span class="muted small">Presentes</span><b class="num" style="font-size:1.3rem" id="lCnt">${pres()} / ${d.dirigentes.length}</b></div>
-    <div class="list" id="lLista">${d.dirigentes.map(x=>`<label class="check"><input type="checkbox" value="${x.id}" ${x.presente?"checked":""}>
-      <span style="flex:1">${esc(x.nombre)}<br><span class="muted tiny">${x.presente?(x.metodo==="qr"?`QR · ${x.hora}`:`A mano · ${x.hora}`):"Ausente"}</span></span></label>`).join("")}</div>
-    <div class="actions"><button class="btn soft" id="lEsc">${I("check")} Volver al escáner</button><button class="btn" data-cerrar>Listo</button></div>`,
+  const cuenta = () => { const c = {presente:0,tarde:0,servicio:0,ausente:0}; d.dirigentes.forEach(x=>c[x.estado]++); return c; };
+  const pl = (n, uno, varios) => `${n} ${n===1?uno:varios}`;
+  const resumen = () => { const c = cuenta(); return `${pl(c.presente+c.tarde,"presente","presentes")}${c.tarde?` (${c.tarde} tarde)`:""} · ${c.servicio} de servicio · ${pl(c.ausente,"ausente","ausentes")}`; };
+  abrirHoja(`<h2>${esc(d.nombre)}</h2><div class="muted small">${d.fecha} · ${esc(d.tipo)}${d.hora_inicio?` · ${d.hora_inicio} h`:""}. Elegí el estado de cada dirigente.</div>
+    <div class="estado neutral small" id="lRes">${resumen()}</div>
+    <div class="list" id="lLista">${d.dirigentes.map(x=>`<div class="item" style="flex-wrap:wrap"><div class="l"><div class="t">${esc(x.nombre)}</div>
+      <div class="muted tiny" data-info="${x.id}">${x.estado==="ausente"?"Sin registro":(x.metodo==="qr"?"QR":"A mano")+(x.hora?" · "+x.hora:"")}</div></div>
+      <select data-m="${x.id}" ${S.reus?.puede_tomar===false?"disabled":""} style="width:auto;min-width:130px;padding:8px">${Object.keys(EST).map(k=>`<option value="${k}" ${x.estado===k?"selected":""}>${EST[k][0]}</option>`).join("")}</select></div>`).join("")}</div>
+    <div class="actions">${S.reus?.puede_tomar===false?"":`<button class="btn soft" id="lEsc">${I("check")} Volver al escáner</button>`}<button class="btn" data-cerrar>Listo</button></div>`,
   (s, cerrar)=>{
-    s.querySelector("#lEsc").onclick = ()=>{ cerrar(); abrirEscaner(rid); };
+    const le = s.querySelector("#lEsc"); if(le) le.onclick = ()=>{ cerrar(); abrirEscaner(rid); };
     s.querySelector("#lLista").onchange = async ev => {
-      const cb = ev.target; if(cb.type!=="checkbox") return; cb.disabled = true;
-      try{ const r = await rpc("marcar_asistencia",{p_codigo:S.codigo,p_reunion:rid,p_miembro:Number(cb.value),p_presente:cb.checked});
-        const it = d.dirigentes.find(x=>x.id===Number(cb.value)); it.presente = cb.checked;
-        cb.parentElement.querySelector(".tiny").textContent = cb.checked ? "A mano · ahora" : "Ausente";
-        s.querySelector("#lCnt").textContent = `${r.presentes} / ${d.dirigentes.length}`;
-      }catch(e){ cb.checked = !cb.checked; toast(e.message); }
-      cb.disabled = false;
+      const sel = ev.target.closest("select[data-m]"); if(!sel) return;
+      const it = d.dirigentes.find(x=>x.id===Number(sel.dataset.m)), antes = it.estado; sel.disabled = true;
+      try{ await rpc("set_asistencia",{p_codigo:S.codigo,p_reunion:rid,p_miembro:it.id,p_estado:sel.value});
+        it.estado = sel.value; s.querySelector(`[data-info="${it.id}"]`).textContent = sel.value==="ausente" ? "Sin registro" : "A mano · ahora";
+        s.querySelector("#lRes").textContent = resumen();
+      }catch(e){ sel.value = antes; toast(e.message); }
+      sel.disabled = false;
     };
   });
   const obs = new MutationObserver(()=>{ if(!document.getElementById("lLista")){ obs.disconnect(); if(!document.getElementById("scanBox")) recargar().catch(()=>{}); } });
@@ -888,6 +1000,8 @@ async function abrirListaReunion(rid){
 function montarAsistencia(){
   const m = $("vMain");
   const n = m.querySelector("[data-nueva-reu]"); if(n) n.onclick = hojaReunion;
+  const xa = m.querySelector("[data-excel-asis]"); if(xa) xa.onclick = e=>{ e.stopPropagation(); ocupado(xa, exportarAsistencia); };
+  m.querySelectorAll("[data-hist]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); hojaHistorial(Number(b.dataset.hist)); });
   m.querySelectorAll("[data-escanear]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirEscaner(Number(b.dataset.escanear)); });
   m.querySelectorAll("[data-lista-reu]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirListaReunion(Number(b.dataset.listaReu)); });
   m.querySelectorAll("[data-anular-reu]").forEach(b=> b.onclick = async e=>{ e.stopPropagation();
@@ -897,6 +1011,77 @@ function montarAsistencia(){
 
 // ===== Gastos =====
 const CATEGORIAS = ["Mercadería","Insumos","Premios","Impresión","Alquiler","Servicios","Transporte","Actividades","Otros"];
+function tabCaja(){
+  const opts = []; if(S.gastos) opts.push(["gastos","Gastos"]); if(S.kiosco) opts.push(["kiosco",`Kiosco${S.kiosco.pendientes.length?` (${S.kiosco.pendientes.length})`:""}`]);
+  if(!opts.find(o=>o[0]===S.caja2)) S.caja2 = opts[0][0];
+  const sel = opts.length>1 ? `<div class="filters">${opts.map(([id,t])=>`<button data-caja2="${id}" aria-pressed="${S.caja2===id}">${t}</button>`).join("")}</div>` : "";
+  return sel + (S.caja2==="kiosco" ? tabKiosco() : tabGastos());
+}
+function linkKiosco(){ return location.origin + location.pathname + "?kiosco"; }
+function tabKiosco(){
+  const k = S.kiosco, res = k.total - k.compras;
+  return `
+  <div class="hero">
+    <div class="lbl">Kiosco · vendido hoy</div>
+    <div class="big num">${fmt(k.hoy)}</div>
+    <span class="chip">Este mes ${fmt(k.mes)}</span>
+    <button class="btn block" data-kiosco-venta>${I("plus")} Registrar una venta</button>
+  </div>
+  ${k.pendientes.length?`<div class="card"><div class="row"><h2>${I("file")} Comprobantes de compradores</h2><span class="pill warn">${k.pendientes.length}</span></div>
+    <div class="muted small">Llegaron por el link público del kiosco. Revisá que la transferencia haya entrado y aprobala.</div>
+    <div class="list">${k.pendientes.map(v=>`<div class="item" style="flex-wrap:wrap"><div class="ic sun">${I("file")}</div>
+      <div class="l"><div class="t">${esc(v.comprador||"Sin nombre")}</div><div class="muted small">${v.fecha}${v.detalle?` · ${esc(v.detalle)}`:""}</div></div>
+      <div class="num" style="font-weight:900">${fmt(v.monto)}</div>
+      <div class="actions" style="width:100%">${v.tiene_comprobante?`<button class="btn soft sm" data-ver-kiosco="${v.id}">${I("file","sm")} Ver</button>`:""}
+        <button class="btn ok sm" data-kiosco-ok="${v.id}">${I("check","sm")} Aprobar</button><button class="btn bad sm" data-kiosco-no="${v.id}">${I("x","sm")} Rechazar</button></div></div>`).join("")}</div></div>`:""}
+  <div class="card"><h2>${I("chart")} Resultado del kiosco</h2>
+    <div class="stats"><div class="stat"><span class="muted tiny">Ventas</span><b class="paid">${fmt(k.total)}</b></div>
+      <div class="stat"><span class="muted tiny">Compras (mercadería)</span><b class="debt">${fmt(k.compras)}</b></div>
+      <div class="stat"><span class="muted tiny">${res>=0?"Ganancia":"Pérdida"}</span><b class="${res>=0?"paid":"debt"}">${fmt(Math.abs(res))}</b></div></div>
+    <div class="muted small">Las compras del kiosco se cargan en Caja → Gastos eligiendo "Kiosco". Todo va solo al libro diario.</div></div>
+  <div class="card"><h2>${I("msg")} Link para compradores</h2>
+    <div class="muted small">Imprimí este QR y pegalo en el kiosco. Quien paga por transferencia lo escanea, sube el comprobante y vos lo aprobás acá. No necesita cuenta ni código.</div>
+    <div class="qrbox" style="width:min(60vw,220px)">${qrSVG(linkKiosco())}</div>
+    <div class="receipt" style="word-break:break-all;text-align:center">${esc(linkKiosco())}</div>
+    <button class="btn soft" data-copiar-kiosco>${I("copy")} Copiar link</button></div>
+  <div class="card"><h2>${I("cash")} Ventas registradas</h2><div class="list">${k.ventas.length ? k.ventas.map(v=>`
+    <div class="item" style="flex-wrap:wrap"><div class="ic ok">${I(v.medio==="Efectivo"?"cash":"file")}</div>
+      <div class="l"><div class="t">${esc(v.detalle||"Venta")}</div><div class="muted small">${v.fecha} · ${v.medio}${v.comprador?` · ${esc(v.comprador)}`:""}${v.cargado_por?` · ${esc(v.cargado_por)}`:""}</div></div>
+      <div class="num paid">${fmt(v.monto)}</div>
+      <div class="actions" style="width:100%">${v.tiene_comprobante?`<button class="btn ghost sm" data-ver-kiosco="${v.id}">${I("file","sm")} Comprobante</button>`:""}
+        <button class="btn ghost sm" data-kiosco-anular="${v.id}">${I("x","sm")} Anular</button></div></div>`).join("")
+    : `<div class="empty"><div class="ic">${I("cash")}</div>Todavía no hay ventas.</div>`}</div></div>`;
+}
+function hojaVentaKiosco(){
+  abrirHoja(`<h2>Registrar venta del kiosco</h2>
+    <div class="muted small">Podés cargar cada venta o el total del día en efectivo.</div>
+    <div class="grid2"><label>Monto ($)<input id="kMonto" type="number" inputmode="numeric" min="1"></label>
+    <label>¿Cómo pagó?<select id="kMedio"><option>Efectivo</option><option>Transferencia</option></select></label></div>
+    <label>Detalle (opcional)<input id="kDet" placeholder="Ej.: Ventas del sábado / Gaseosa y pancho"></label>
+    <div class="grid2"><label>Comprador (opcional)<input id="kComp"></label><label>Fecha<input id="kFecha" type="date" value="${hoyISO()}"></label></div>
+    <div class="err" id="kErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="kOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b = s.querySelector("#kOk"); b.onclick = () => ocupado(b, async()=>{
+    try{ await rpc("kiosco_registrar",{p_codigo:S.codigo,p_fecha:s.querySelector("#kFecha").value||null,p_monto:Number(s.querySelector("#kMonto").value),
+        p_medio:s.querySelector("#kMedio").value,p_detalle:s.querySelector("#kDet").value,p_comprador:s.querySelector("#kComp").value});
+      cerrar(); await recargar(); toast("Venta registrada");
+    }catch(e){ const er=s.querySelector("#kErr"); er.textContent=e.message; er.hidden=false; } }); });
+}
+function montarCaja(){
+  const m = $("vMain");
+  m.querySelectorAll("[data-caja2]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); S.caja2 = b.dataset.caja2; render(); });
+  const nv = m.querySelector("[data-kiosco-venta]"); if(nv) nv.onclick = hojaVentaKiosco;
+  const ck = m.querySelector("[data-copiar-kiosco]"); if(ck) ck.onclick = async e=>{ e.stopPropagation(); try{ await navigator.clipboard.writeText(linkKiosco()); toast("Link copiado"); }catch(_){ toast("No se pudo copiar"); } };
+  m.querySelectorAll("[data-ver-kiosco]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); ocupado(b, async()=>{
+    try{ const {url} = await fnComprobantes({accion:"ver_kiosco",codigo:S.codigo,venta_id:Number(b.dataset.verKiosco)}); window.open(url,"_blank","noopener"); }catch(er){ toast(er.message) } }); });
+  m.querySelectorAll("[data-kiosco-ok],[data-kiosco-no]").forEach(b=> b.onclick = async e=>{ e.stopPropagation();
+    const ok = !!b.dataset.kioscoOk, id = Number(b.dataset.kioscoOk || b.dataset.kioscoNo);
+    if(!ok && !await confirmar("¿Rechazar el comprobante?","La venta no entra al libro diario.","Rechazar")) return;
+    ocupado(b, async()=>{ try{ await rpc("kiosco_revisar",{p_codigo:S.codigo,p_id:id,p_aprobar:ok}); await recargar(); toast(ok?"Venta aprobada":"Comprobante rechazado"); }catch(er){ toast(er.message) } }); });
+  m.querySelectorAll("[data-kiosco-anular]").forEach(b=> b.onclick = async e=>{ e.stopPropagation();
+    if(!await confirmar("¿Anular esta venta?","Deja de contar en el kiosco y en el libro diario.","Anular")) return;
+    ocupado(b, async()=>{ try{ await rpc("kiosco_anular",{p_codigo:S.codigo,p_id:Number(b.dataset.kioscoAnular)}); await recargar(); toast("Venta anulada"); }catch(er){ toast(er.message) } }); });
+}
 function tabGastos(){
   const gs = S.gastos || [];
   const total = gs.reduce((s,g)=>s+Number(g.monto),0);
@@ -930,7 +1115,7 @@ function hojaGasto(){
     <label>¿Qué se compró o pagó?<input id="gDesc" placeholder="Ej.: Carne y verduras para el locro"></label>
     <div class="grid2"><label>Monto ($)<input id="gMonto" type="number" inputmode="numeric" min="1"></label>
     <label>Fecha<input id="gFecha" type="date" value="${hoyISO()}"></label></div>
-    <label>¿Para qué evento?<select id="gEv"><option value="">Gasto general (no es de un evento)</option>${evs.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
+    <label>¿Para qué es?<select id="gEv"><option value="">Gasto general (no es de un evento)</option><option value="k">Kiosco (compra de mercadería)</option>${evs.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
     <div class="grid2"><label>Tipo de gasto<select id="gCat">${CATEGORIAS.map(c=>`<option>${c}</option>`).join("")}</select></label>
     <label>¿Cómo se pagó?<select id="gMedio"><option>Efectivo</option><option>Transferencia</option></select></label></div>
     <label class="file" id="gFileBox">${I("upload")}<span id="gFileTxt"><b>Foto de la factura o ticket</b><br><span class="small">Opcional, se puede agregar después</span></span>
@@ -946,7 +1131,7 @@ function hojaGasto(){
       try{
         const ev = s.querySelector("#gEv").value;
         const r = await rpc("registrar_gasto",{p_codigo:S.codigo,p_fecha:s.querySelector("#gFecha").value||null,p_descripcion:s.querySelector("#gDesc").value,
-          p_categoria:s.querySelector("#gCat").value,p_evento:ev?Number(ev):null,p_monto:Number(s.querySelector("#gMonto").value),p_medio:s.querySelector("#gMedio").value});
+          p_categoria:s.querySelector("#gCat").value,p_evento:ev&&ev!=="k"?Number(ev):null,p_monto:Number(s.querySelector("#gMonto").value),p_medio:s.querySelector("#gMedio").value,p_kiosco:ev==="k"});
         if(inp.files[0]){ try{ await subirFacturaGasto(r.id, inp.files[0]); }catch(e){ toast("El gasto se guardó, pero la factura no: "+e.message); } }
         cerrar(); await recargar(); toast("Gasto guardado");
       }catch(e){ err.textContent=e.message; err.hidden=false; }
@@ -1023,6 +1208,8 @@ function montarExtras(){
   if($("btnMailsOnOff")) $("btnMailsOnOff").onclick = async () => {
     if(!S.mails && !await confirmar("¿Encender los mails?","Hacelo solo si ya cargaste el Gmail y la contraseña de aplicación en Supabase. Probalo primero con Enviar prueba.","Encender","")) return;
     ocupado($("btnMailsOnOff"), async()=>{ try{ await rpc("set_mails_activos",{p_codigo:S.codigo,p_activo:!S.mails}); await recargar(); toast(S.mails?"Mails encendidos":"Mails apagados"); }catch(er){ toast(er.message) } }); };
+  if(S.tab==="reportes"){ const xr = m.querySelector("[data-excel-asis]"); if(xr) xr.onclick = e=>{ e.stopPropagation(); ocupado(xr, exportarAsistencia); }; }
+  const xp = m.querySelector("[data-excel-aportes]"); if(xp) xp.onclick = e=>{ e.stopPropagation(); ocupado(xp, exportarAportes); };
   if($("cfgGuardar")) $("cfgGuardar").onclick = () => ocupado($("cfgGuardar"), async()=>{
     try{ await rpc("guardar_config",{p_codigo:S.codigo,p_parroquia:$("cfgNom").value,p_app_url:$("cfgUrl").value}); await recargar(); toast("Ajustes guardados"); }catch(er){ toast(er.message) } });
   if(S.tab==="gestion" && S.sub==="drive" && !S.token){
@@ -1053,9 +1240,11 @@ function hojaRecibo(r){
     <button class="btn ghost" data-cerrar>Cerrar</button>`,
   (s)=>{ s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(txt);toast("Recibo copiado")}catch(_){toast("No se pudo copiar")} }; });
 }
-function hojaLink(nombre, celular, codigo, esTesorero){
+function hojaLink(nombre, celular, codigo, esTesorero, esAutoridad){
   const link = linkPersonal(codigo);
-  const msg = esTesorero
+  const msg = esAutoridad
+    ? `Hola ${primer(nombre)}, este es tu acceso para ver la asistencia de los dirigentes. No lo compartas:\n${link}`
+    : esTesorero
     ? `Hola ${primer(nombre)}, este es tu acceso como tesorero a la app de aportes. No lo compartas:\n${link}`
     : `Hola ${primer(nombre)}, este es tu link personal para ver tu cuenta de aportes y subir comprobantes. No lo compartas:\n${link}`;
   abrirHoja(`<h2>Acceso de ${esc(nombre)}</h2>
@@ -1083,6 +1272,18 @@ function hojaLink(nombre, celular, codigo, esTesorero){
 }
 
 // ===== Formularios de gestión =====
+function hojaAutoridad(t){
+  abrirHoja(`<h2>${t?"Editar autoridad":"Nueva autoridad"}</h2>
+    <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
+    <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" value="${esc(t?.celular||"")}"></label>
+    <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
+  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{ const r = await rpc("guardar_autoridad",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      cerrar(); await recargar(); toast("Autoridad guardada"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true, true);
+    }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
+}
 function hojaTesorero(t){
   abrirHoja(`<h2>${t?"Editar tesorero":"Nuevo tesorero"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
@@ -1096,7 +1297,7 @@ function hojaTesorero(t){
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
 }
 function hojaMiembro(m){
-  const act = S.panel.tesoreros.filter(t=>t.activo);
+  const act = S.panel.tesoreros.filter(t=>t.activo && t.rol!=="autoridad");
   abrirHoja(`<h2>${m?"Editar dirigente":"Nuevo dirigente"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(m?.nombre||"")}"></label>
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(m?.celular||"")}"></label>
@@ -1121,7 +1322,7 @@ function hojaEvento(e){
     <label>¿Qué parte de lo que vende cada dirigente se suma a su aporte?
       <div class="filters" id="fPctBtns" style="margin-top:4px">${[0,50,100].map(v=>`<button type="button" data-pct="${v}" aria-pressed="false">${v===0?"Nada":v+"%"}</button>`).join("")}</div>
       <input id="fPct" type="number" inputmode="numeric" min="0" max="100" value="${pctEv(e)}" style="margin-top:6px"></label>
-    <div class="muted small">Ejemplo: con 50%, si un dirigente paga $ 10.000 de este evento, $ 5.000 se descuentan de sus cuotas de aporte.</div>
+    <div class="muted small">Ejemplo: con 50%, si un dirigente paga $ 10.000 de este evento, $ 5.000 se suman a su aporte.</div>
     ${e?`<div class="muted small">Si cambiás el precio, vale para las próximas entregas. Lo ya entregado mantiene su precio.</div>`:""}
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
@@ -1134,7 +1335,7 @@ function hojaEvento(e){
       cerrar(); await recargar(); toast("Evento guardado");
     }catch(er){ const x=s.querySelector("#fErr"); x.textContent=er.message; x.hidden=false; } }); });
 }
-function hojaAsignar(t){
+function hojaAsignar(t){ if(t.rol==="autoridad") return;
   const ms = S.panel.miembros.filter(m=>m.activo);
   const nom = id => (S.panel.tesoreros.find(x=>x.id===id)||{}).nombre;
   abrirHoja(`<h2>Dirigentes a cargo de ${esc(t.nombre)}</h2>
@@ -1192,6 +1393,11 @@ function montarTesorero(){
       return ocupado(b, async()=>{ try{ const q = await rpc("qr_de",{p_codigo:S.codigo,p_miembro:x.id});
         abrirHoja(`<h2>QR de ${esc(x.nombre)}</h2><div class="qrbox">${qrSVG(q)}</div><div class="muted small">Sirve para tomarle asistencia si no tiene el celular: sacale una captura o imprimilo.</div><button class="btn soft" data-cerrar>Cerrar</button>`);
       }catch(er){ toast(er.message) } }); }
+    if(ds.kioscoPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.kioscoPerm);
+      return ocupado(b, async()=>{ try{ await rpc("set_puede_kiosco",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede manejar el kiosco`); }catch(er){ toast(er.message) } }); }
+    if(ds.nuevaAut!==undefined) return hojaAutoridad(null);
+    if(ds.editAut) return hojaAutoridad(P.tesoreros.find(x=>x.id==ds.editAut));
+    if(ds.linkAut){ const t=P.tesoreros.find(x=>x.id==ds.linkAut); return hojaLink(t.nombre,t.celular,t.codigo,true,true); }
     if(ds.gastoPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.gastoPerm);
       if(!tiene && !await confirmar(`¿Permitir que ${t.nombre} cargue gastos?`, "Va a poder cargar gastos y anular los que cargue. Los demás tesoreros los ven, pero no pueden cargar.", "Permitir", "")) return;
       return ocupado(b, async()=>{ try{ await rpc("set_puede_gastar",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede cargar gastos`); }catch(er){ toast(er.message) } }); }
@@ -1268,7 +1474,11 @@ async function abrirDetalle(b){
       <div class="list">${conceptosHTML(c.conceptos)}</div>
       <h3>Historial de pagos</h3>
       <div class="list">${pagosHTML(c.pagos, true)}</div>
+      <h3>Asistencia</h3>
+      <div data-asis-det style="display:flex;flex-direction:column;gap:10px"><div class="muted small">Cargando…</div></div>
       <div class="actions"><button class="btn soft sm" data-link-det>${I("msg","sm")} Enviarle su link</button></div>`;
+    rpc("asistencia_de",{p_codigo:S.codigo,p_miembro:Number(b.dataset.mem)}).then(a=>{ const box = det.querySelector("[data-asis-det]"); if(box) box.innerHTML = historialAsisHTML(a, false); })
+      .catch(()=>{ const box = det.querySelector("[data-asis-det]"); if(box) box.innerHTML = `<div class="muted small">No se pudo cargar la asistencia.</div>`; });
     det.querySelector("[data-link-det]").onclick = (ev) => { ev.stopPropagation();
       const link = linkPersonal(c.miembro.codigo);
       const msg = `Hola ${primer(c.miembro.nombre)}, este es tu link personal para ver tu cuenta de aportes y subir comprobantes. No lo compartas:\n${link}`;
@@ -1281,9 +1491,40 @@ async function abrirDetalle(b){
 // ===== Inicio =====
 $("btnEntrar").onclick = ()=>{ const c=$("inCodigo").value.trim(); if(c){ $("loginErr").hidden=true; entrar(c); } };
 $("inCodigo").onkeydown = e => { if(e.key==="Enter") $("btnEntrar").click(); };
+function paginaKiosco(){
+  $("tabs").hidden = true; for(const v of ["vCargando","vLogin"]) $(v).hidden = true; $("vMain").hidden = false;
+  $("vMain").innerHTML = `<div class="login" style="min-height:auto;padding-top:20px">
+    <div class="logo">${I("cash")}</div><h1>Kiosco · enviá tu comprobante</h1>
+    <div class="muted">Si pagaste por transferencia, cargá el monto y la foto del comprobante. Gracias por colaborar.</div></div>
+    <div class="card" id="kpForm">
+      <label>Monto que transferiste ($)<input id="kpMonto" type="number" inputmode="numeric" min="1"></label>
+      <label>Tu nombre (opcional)<input id="kpNom" autocomplete="name"></label>
+      <label>¿Qué compraste? (opcional)<input id="kpDet" placeholder="Ej.: Pancho y gaseosa"></label>
+      <label class="file" id="kpBox">${I("upload")}<span id="kpTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
+        <input id="kpFile" type="file" accept="image/*,application/pdf"></label>
+      <div class="err" id="kpErr" hidden></div>
+      <button class="btn block" id="kpOk">${I("send")} Enviar comprobante</button>
+    </div>
+    <div class="card" id="kpGracias" hidden style="align-items:center;text-align:center"><div class="ic ok" style="width:56px;height:56px">${I("check")}</div>
+      <h2>¡Listo, gracias!</h2><div class="muted">Recibimos tu comprobante.</div><button class="btn soft" id="kpOtro">Enviar otro</button></div>`;
+  const f = $("kpFile");
+  f.onchange = ()=>{ const x=f.files[0]; $("kpBox").classList.toggle("has",!!x); $("kpTxt").innerHTML = x?`<b>${esc(x.name)}</b>`:"<b>Tocá para elegir el comprobante</b>"; };
+  $("kpOtro").onclick = ()=>{ $("kpGracias").hidden = true; $("kpForm").hidden = false; ["kpMonto","kpDet"].forEach(i=>$(i).value=""); f.value=""; f.onchange(); };
+  $("kpOk").onclick = () => ocupado($("kpOk"), async()=>{
+    $("kpErr").hidden = true;
+    try{ const monto = Number($("kpMonto").value); let x = f.files[0];
+      if(!(monto>0)) throw new Error("Escribí el monto que transferiste.");
+      if(!x) throw new Error("Elegí la foto o el PDF del comprobante.");
+      x = await comprimir(x);
+      const fd = new FormData(); fd.append("tipo","kiosco"); fd.append("monto",String(monto)); fd.append("comprador",$("kpNom").value); fd.append("detalle",$("kpDet").value); fd.append("archivo",x);
+      await fnComprobantes(fd); $("kpForm").hidden = true; $("kpGracias").hidden = false;
+    }catch(e){ $("kpErr").textContent = e.message; $("kpErr").hidden = false; }
+  });
+}
 const desdeLink = new URLSearchParams(location.search).get("c");
 const inicial = desdeLink || read("aportes_codigo");
-if(inicial) entrar(inicial); else mostrar("vLogin");
+if(new URLSearchParams(location.search).has("kiosco")) paginaKiosco();
+else if(inicial) entrar(inicial); else mostrar("vLogin");
 </script>
 </body>
 </html>
