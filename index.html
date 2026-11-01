@@ -817,7 +817,7 @@ const pillEst = e => `<span class="pill ${EST[e][1]}">${EST[e][0]}</span>`;
 const pctAsis = a => { const base = a.total - (a.servicio||0); return base>0 ? Math.round(a.presentes/base*100) : null; };
 function alertaRacha(racha, propio){
   if(racha>=3) return `<div class="estado bad">${I("alert")}<span>${propio?"Llevás":"Lleva"} ${racha} faltas seguidas.${propio?" Hablá con tu guía.":""}</span></div>`;
-  if(racha===2) return `<div class="estado ${propio?"bad":"neutral"}">${I("alert")}<span>${propio?"Atención: llevás 2 faltas seguidas. A la tercera se avisa al guía.":"Lleva 2 faltas seguidas."}</span></div>`;
+  if(racha===2) return `<div class="estado ${propio?"bad":"neutral"}">${I("alert")}<span>${propio?"¡Llevás dos faltas seguidas! Recordá que tu ausencia recarga a otros.":"Lleva 2 faltas seguidas."}</span></div>`;
   return "";
 }
 function historialAsisHTML(a, propio){
@@ -1497,8 +1497,8 @@ function paginaKiosco(){
     <div class="logo">${I("cash")}</div><h1>Kiosco · enviá tu comprobante</h1>
     <div class="muted">Si pagaste por transferencia, cargá el monto y la foto del comprobante. Gracias por colaborar.</div></div>
     <div class="card" id="kpForm">
+      <label>Tu nombre y apellido<input id="kpNom" autocomplete="name" required placeholder="Ej.: Carlos Pérez"></label>
       <label>Monto que transferiste ($)<input id="kpMonto" type="number" inputmode="numeric" min="1"></label>
-      <label>Tu nombre (opcional)<input id="kpNom" autocomplete="name"></label>
       <label>¿Qué compraste? (opcional)<input id="kpDet" placeholder="Ej.: Pancho y gaseosa"></label>
       <label class="file" id="kpBox">${I("upload")}<span id="kpTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
         <input id="kpFile" type="file" accept="image/*,application/pdf"></label>
@@ -1513,6 +1513,7 @@ function paginaKiosco(){
   $("kpOk").onclick = () => ocupado($("kpOk"), async()=>{
     $("kpErr").hidden = true;
     try{ const monto = Number($("kpMonto").value); let x = f.files[0];
+      if($("kpNom").value.trim().length < 2) throw new Error("Escribí tu nombre y apellido.");
       if(!(monto>0)) throw new Error("Escribí el monto que transferiste.");
       if(!x) throw new Error("Elegí la foto o el PDF del comprobante.");
       x = await comprimir(x);
