@@ -140,7 +140,7 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 /* Pestañas abajo */
 .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:15}
 .tabs .in{display:flex;max-width:600px;width:100%}
-.tab{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;font-weight:800;color:var(--muted);cursor:pointer;border-radius:12px;position:relative}
+.tab{flex:1;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 1px;font-size:.66rem;font-weight:800;color:var(--muted);cursor:pointer;border-radius:12px;position:relative}
 .tab[aria-current="page"]{color:var(--brand);background:var(--brand-soft)}
 .tab .badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:999px;font-size:.65rem;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px}
 
@@ -162,6 +162,14 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 .empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;color:var(--muted);text-align:center}
 .empty .ic{width:48px;height:48px;border-radius:16px}
 .sec-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:6px 4px -4px}
+.qrbox{background:#fff;border-radius:18px;padding:14px;align-self:center;width:min(78vw,300px);aspect-ratio:1;display:grid;place-items:center}
+.qrbox svg{width:100%;height:100%}
+.scan{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:1;width:100%;max-width:420px;align-self:center}
+.scan video{width:100%;height:100%;object-fit:cover;display:block}
+.scan .mira{position:absolute;inset:14%;border:4px solid rgba(255,255,255,.85);border-radius:22px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.scan.ok .mira{border-color:#3fd68a} .scan.bad .mira{border-color:#ff7a7a}
+.ultimo{border-radius:14px;padding:12px 14px;font-weight:800;text-align:center}
+.bigpct{font-size:2.6rem;font-weight:900;line-height:1}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -218,6 +226,7 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
   <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
 </svg>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 // ===== Conexión =====
 const SUPABASE_URL = "https://hrqoghervpbwjbeclbwz.supabase.co";
@@ -302,7 +311,7 @@ function confirmar(titulo, texto, boton, cls="bad"){
 }
 
 // ===== Estado =====
-const S = { codigo:null, data:null, panel:null, caja:null, mails:false, gastos:null, token:null, tab:"inicio", filtro:"todos", busca:"", sub:"tesoreros" };
+const S = { codigo:null, data:null, panel:null, caja:null, mails:false, asis:null, reus:null, permAsis:[], mtab:"aportes", gastos:null, token:null, tab:"inicio", filtro:"todos", busca:"", sub:"tesoreros" };
 
 async function entrar(cod){
   mostrar("vCargando");
@@ -312,6 +321,7 @@ async function entrar(cod){
     store("aportes_codigo", S.codigo);
     await cargarExtras();
     S.tab = read("aportes_tab_"+S.data.tipo) || "inicio";
+    S.mtab = read("aportes_mtab") || "aportes";
     render();
   }catch(e){
     store("aportes_codigo", null);
@@ -324,11 +334,12 @@ async function recargar(){
   render();
 }
 async function cargarExtras(){
-  if(S.data.tipo==="miembro") return;
-  const tareas = [rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
+  if(S.data.tipo==="miembro"){ S.asis = await rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null); return; }
+  const tareas = [rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.tipo==="guia"){
     tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
     tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
+    tareas.push(rpc("permisos_asistencia",{p_codigo:S.codigo}).then(r=>S.permAsis=r||[]).catch(()=>S.permAsis=[]));
     tareas.push(rpc("permisos_gasto",{p_codigo:S.codigo}).then(r=>S.permGasto=r||[]).catch(()=>S.permGasto=[]));
     tareas.push(rpc("guia_mails_estado",{p_codigo:S.codigo}).then(r=>S.mails=!!r).catch(()=>S.mails=false));
   }
@@ -336,7 +347,7 @@ async function cargarExtras(){
 }
 function mostrar(id){
   for(const v of ["vCargando","vLogin","vMain"]) $(v).hidden = v!==id;
-  $("tabs").hidden = !(id==="vMain" && S.data && S.data.tipo!=="miembro");
+  $("tabs").hidden = !(id==="vMain" && S.data);
 }
 function salir(){
   store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null;
@@ -352,9 +363,12 @@ function cabecera(nombre, sub, sun){
 function render(){
   mostrar("vMain");
   const m = $("vMain");
-  if(S.data.tipo==="miembro"){ m.innerHTML = vistaMiembro(); montarMiembro(); return; }
+  if(S.data.tipo==="miembro"){
+    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
+    m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : vistaMiembro(); montarMiembro(); return; }
   const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
   if(S.gastos) tabs.push(["gastos","Gastos","receipt"]);
+  if(S.reus) tabs.push(["asistencia","Asistencia","check"]);
   if(S.data.tipo==="guia") tabs.push(["gestion","Gestión","sliders"],["reportes","Reportes","chart"]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
   const pend = S.data.pendientes.length;
@@ -368,10 +382,13 @@ function render(){
   if(S.tab==="gestion") body = tabGestion();
   if(S.tab==="reportes") body = tabReportes();
   if(S.tab==="gastos") body = tabGastos();
+  if(S.tab==="asistencia") body = tabAsistencia();
   m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
-  montarTesorero(); montarExtras();
+  montarTesorero(); montarExtras(); montarAsistencia();
 }
-$("tabsIn").onclick = e => { const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+S.data.tipo, S.tab); render(); scrollTo({top:0}); };
+$("tabsIn").onclick = e => {
+  const mb=e.target.closest("[data-mtab]"); if(mb){ S.mtab=mb.dataset.mtab; store("aportes_mtab",S.mtab); render(); scrollTo({top:0}); return; }
+  const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+S.data.tipo, S.tab); render(); scrollTo({top:0}); };
 
 // ===== Aporte anual =====
 function estadoAporte(a){
@@ -397,8 +414,10 @@ function aporteHTML(a, propio){
       <div class="stat"><span class="muted tiny">Pagado${a.en_revision>0?` · ${fmt(a.en_revision)} en revisión`:""}</span><b class="paid">${fmt(a.pagado)}</b></div>
       <div class="stat"><span class="muted tiny">Falta para cancelar el año</span><b class="${a.falta_anio>0?"debt":"paid"}">${a.falta_anio>0?fmt(a.falta_anio):"Nada"}</b></div>
     </div>
+    ${a.credito_eventos>0?`<div class="estado neutral">${I("gift")}<span>${fmt(a.credito_eventos)} de lo pagado ${propio?"viene de tus ventas":"viene de sus ventas"} de eventos (bonos, etc.)</span></div>`:""}
     ${a.meses_vencidos>0?`<div class="muted small">A ${a.mes_actual} ${propio?"deberías":"debería"} llevar ${fmt(a.debido_a_hoy)} (${a.meses_vencidos} de ${n} cuotas de ${fmt(a.mensual)}). Las cuotas van de ${a.mes_desde} a ${a.mes_hasta}.</div>`:""}`;
 }
+const pctTxt = n => (Math.round(Number(n)*100)/100).toLocaleString("es-AR") + "%";
 function icConcepto(nombre){
   const n = nombre.toLowerCase();
   if(n.startsWith("aporte")) return ["heart",""];
@@ -407,7 +426,7 @@ function icConcepto(nombre){
 function conceptosHTML(cs){
   return cs.map(r=>{ const [ic,c]=icConcepto(r.nombre); return `
     <div class="item"><div class="ic ${c}">${I(ic)}</div><div class="l"><div class="t">${esc(r.nombre)}</div>
-      <div class="muted small">${r.evento_id===null?`${r.cantidad} cuotas vencidas`:`${plural(r.cantidad,r)} × ${fmt(r.precio)}`} · pagado ${fmt(r.pagado)}${r.pendiente>0?` · ${fmt(r.pendiente)} en revisión`:""}</div></div>
+      <div class="muted small">${r.evento_id===null?`${r.cantidad} cuotas vencidas`:`${plural(r.cantidad,r)} × ${fmt(r.precio)}${r.pct_aporte>0?` · ${pctTxt(r.pct_aporte)} va al aporte`:""}`} · pagado ${fmt(r.pagado)}${r.de_eventos>0?` (${fmt(r.de_eventos)} de eventos)`:""}${r.pendiente>0?` · ${fmt(r.pendiente)} en revisión`:""}</div></div>
       <div class="num ${r.saldo>0?"debt":"paid"}">${r.saldo>0?fmt(r.saldo):(r.a_favor>0?`+${fmt(r.a_favor)}`:I("check"))}</div></div>`}).join("");
 }
 function pillEstado(e){return e==="verificado"?`<span class="pill ok">${I("check","sm")}Verificado</span>`:e==="pendiente"?`<span class="pill warn">${I("clock","sm")}En revisión</span>`:`<span class="pill bad">${I("x","sm")}Rechazado</span>`}
@@ -416,6 +435,7 @@ function pagosHTML(ps, reenviar){
     <div class="item"><div class="ic ${p.estado==="verificado"?"ok":p.estado==="pendiente"?"sun":"bad"}">${I(p.medio==="Efectivo"?"cash":"file")}</div>
       <div class="l"><div class="t">${esc(p.concepto)}</div>
       <div class="muted small">${p.fecha} · ${p.medio}${p.recibo_nro?` · Recibo ${p.recibo_nro}`:""}</div>
+      ${p.pct_aporte>0?`<span class="pill neutral">${I("heart","sm")} ${fmt(p.monto*p.pct_aporte/100)} al aporte</span>`:""}
       ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}</div>
       <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end"><div class="num" style="font-weight:800">${fmt(p.monto)}</div>${pillEstado(p.estado)}</div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no hay pagos registrados.</div>`;
@@ -443,7 +463,7 @@ function vistaMiembro(){
 function montarMiembro(){
   $("vMain").onclick = null; $("vMain").onchange = null;
   $("vMain").querySelector("[data-salir]").onclick = salir;
-  $("vMain").querySelector("[data-pagar]").onclick = hojaPago;
+  const pg = $("vMain").querySelector("[data-pagar]"); if(pg) pg.onclick = hojaPago;
 }
 function hojaPago(){
   const ev = S.data.eventos;
@@ -451,6 +471,7 @@ function hojaPago(){
     <div class="muted small">Subí la foto o el PDF del comprobante. Tu tesorero lo revisa y te llega el recibo por mail. Si pagaste en efectivo, lo carga tu tesorero.</div>
     <label>¿Qué estás pagando?<select id="pConcepto"><option value="">Aporte mensual</option>${ev.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
     <label id="pCantBox" hidden>¿Cuántas unidades pagás?<input id="pCant" type="number" inputmode="numeric" min="1" value="1"></label>
+    <div class="estado neutral small" id="pPctAviso" hidden></div>
     <label>Monto que transferiste ($)<input id="pMonto" type="number" inputmode="numeric" min="1" placeholder="Ej.: ${Math.round(S.data.cuenta.miembro.aporte_mensual)||10000}"></label>
     <label class="file" id="pFileBox">${I("upload")}<span id="pFileTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
       <input id="pArchivo" type="file" accept="image/*,application/pdf"></label>
@@ -459,7 +480,10 @@ function hojaPago(){
   (s, cerrar)=>{
     const selC = s.querySelector("#pConcepto"), cantBox = s.querySelector("#pCantBox"), cant = s.querySelector("#pCant"), montoI = s.querySelector("#pMonto");
     const calc = ()=>{ const e = ev.find(x=>String(x.id)===selC.value); cantBox.hidden = !e;
-      if(e){ cantBox.firstChild.textContent = `¿Cuántas ${e.unidad_plural} pagás? (${fmt(e.precio)} c/u)`; montoI.value = Math.round((Number(cant.value)||0)*e.precio); } };
+      if(e){ cantBox.firstChild.textContent = `¿Cuántas ${e.unidad_plural} pagás? (${fmt(e.precio)} c/u)`; montoI.value = Math.round((Number(cant.value)||0)*e.precio); }
+      const av = s.querySelector("#pPctAviso"); av.hidden = !(e && e.pct_aporte>0);
+      if(e && e.pct_aporte>0) av.innerHTML = `${I("heart","sm")}<span>El ${pctTxt(e.pct_aporte)} de lo que pagues de ${esc(e.nombre)} se suma a tu aporte: <b>${fmt((Number(montoI.value)||0)*e.pct_aporte/100)}</b>.</span>`; };
+    montoI.addEventListener("input", calc);
     selC.onchange = ()=>{ if(!ev.find(x=>String(x.id)===selC.value)) montoI.value=""; calc(); }; cant.oninput = calc;
     const inp = s.querySelector("#pArchivo");
     inp.onchange = ()=>{ const f=inp.files[0]; s.querySelector("#pFileBox").classList.toggle("has",!!f); s.querySelector("#pFileTxt").innerHTML = f?`<b>${esc(f.name)}</b><br><span class="small">Tocá para cambiarlo</span>`:"<b>Tocá para elegir el comprobante</b>"; };
@@ -561,12 +585,13 @@ function tabGestion(){
     <div class="row"><h2>${I("award")} Tesoreros</h2><button class="btn sm" data-nuevo-tes>${I("plus","sm")} Nuevo</button></div>
     <div class="list">${tes.map(t=>`
       <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm ${t.rol==="guia"?"sun":""}">${esc(ini(t.nombre))}</div>
-        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
+        <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.rol!=="guia"&&(S.permAsis||[]).includes(t.id)?` <span class="pill ok">${I("check","sm")}Toma asistencia</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
         <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}</div></div>
         <div class="actions" style="width:100%">
           ${t.activo?`<button class="btn soft sm" data-asig="${t.id}">${I("users","sm")} Dirigentes a cargo</button>
           <button class="btn soft sm" data-link-tes="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
           <button class="btn ghost sm" data-edit-tes="${t.id}">${I("edit","sm")} Editar</button>
+          ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-asis-perm="${t.id}" data-tiene="${(S.permAsis||[]).includes(t.id)}">${I("check","sm")} ${(S.permAsis||[]).includes(t.id)?"Quitar permiso de asistencia":"Permitir tomar asistencia"}</button>`:""}
           ${t.activo&&t.rol!=="guia"?`<button class="btn ghost sm" data-gasto-perm="${t.id}" data-tiene="${(S.permGasto||[]).includes(t.id)}">${I("receipt","sm")} ${(S.permGasto||[]).includes(t.id)?"Quitar permiso de gastos":"Permitir cargar gastos"}</button>`:""}
           ${t.rol!=="guia"?`<button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Dar de baja":"Reactivar"}</button>`:""}
         </div></div>`).join("")}</div>
@@ -583,6 +608,7 @@ function tabGestion(){
         <div class="actions" style="width:100%">
           <button class="btn ghost sm" data-edit-mem="${m.id}">${I("edit","sm")} Editar</button>
           ${m.activo?`<button class="btn ghost sm" data-link-mem="${m.id}">${I("msg","sm")} Enviar acceso</button>`:""}
+          ${m.activo?`<button class="btn ghost sm" data-ver-qr="${m.id}">${I("check","sm")} Ver QR</button>`:""}
           <button class="btn ghost sm" data-baja-mem="${m.id}" data-activo="${m.activo}">${I("power","sm")} ${m.activo?"Dar de baja":"Reactivar"}</button>
         </div></div>`).join("")}</div>
   </div>`;
@@ -592,6 +618,7 @@ function tabGestion(){
     <div class="list">${p.eventos.map(e=>`
       <div class="item" style="flex-wrap:wrap;${e.activo?"":"opacity:.6"}"><div class="ic sun">${I("gift")}</div>
         <div class="l"><div class="t">${esc(e.nombre)}${e.activo?"":` <span class="pill off">Cerrado</span>`}</div>
+        ${pctEv(e)>0?`<span class="pill neutral">${I("heart","sm")} ${pctTxt(pctEv(e))} se suma al aporte</span>`:""}
         <div class="muted small">${fmt(e.precio)} por ${esc(e.unidad)} · ${e.entregado} ${esc(e.unidad_plural)} entregados · cobrado ${fmt(e.cobrado)} de ${fmt(e.cargo)}</div></div>
         <div class="actions" style="width:100%"><button class="btn ghost sm" data-edit-ev="${e.id}">${I("edit","sm")} Editar</button>
           <button class="btn ghost sm" data-baja-ev="${e.id}" data-activo="${e.activo}">${I("power","sm")} ${e.activo?"Cerrar":"Reabrir"}</button></div></div>`).join("")}</div>
@@ -648,6 +675,8 @@ function tabReportes(){
   const pct = (a,b)=> b>0 ? Math.min(100, Math.round(a/b*100)) : 0;
   const saldo = c.ingresos - c.egresos;
   const evs = c.eventos.filter(e=>e.vendido>0 || e.gastos>0);
+  const act = p.miembros.filter(m=>m.activo);
+  const apCob = act.reduce((s,m)=>s+Number(m.aporte.pagado||0),0), apCred = act.reduce((s,m)=>s+Number(m.aporte.credito_eventos||0),0);
   return `
   <div class="hero">
     <div class="lbl">Saldo de caja (ingresos menos gastos)</div>
@@ -661,7 +690,7 @@ function tabReportes(){
     <div class="kpi"><span class="k">Atrasados en el aporte</span><span class="v">${r.atrasados} <span class="muted small">de ${r.dirigentes}</span></span></div>
   </div>
   <div class="card"><h2>${I("gift")} Resultado por evento</h2>
-    ${evs.length ? evs.map(e=>{ const res = e.cobrado - e.gastos, proy = e.vendido - e.gastos; return `
+    ${evs.length ? evs.map(e=>{ const pa = Number(e.pct_aporte)||0, res = e.cobrado - e.a_aportes - e.gastos, proy = e.vendido*(1-pa/100) - e.gastos; return `
     <div style="display:flex;flex-direction:column;gap:8px;padding:10px 0;border-top:1px solid var(--line)">
       <div class="row"><span class="t" style="font-weight:800">${esc(e.nombre)}</span>
         <span class="pill ${res>=0?"ok":"bad"}">${res>=0?"Ganancia":"Pérdida"} ${fmt(Math.abs(res))}</span></div>
@@ -670,6 +699,7 @@ function tabReportes(){
         <div class="stat"><span class="muted tiny">Cobrado</span><b class="paid">${fmt(e.cobrado)}</b></div>
         <div class="stat"><span class="muted tiny">Gastos</span><b class="debt">${fmt(e.gastos)}</b></div>
       </div>
+      ${e.a_aportes>0||pa>0?`<div class="estado neutral small">${I("heart","sm")}<span>${pctTxt(pa)} va al aporte de cada dirigente: ${fmt(e.a_aportes)} ya se descontaron de sus cuotas y no cuentan como ganancia del evento.</span></div>`:""}
       <div class="prog"><span style="width:${pct(e.cobrado, e.vendido)}%"></span></div>
       <div class="muted small">${e.vendido>e.cobrado?`Falta cobrar ${fmt(e.vendido-e.cobrado)}. Si se cobra todo, el resultado sería ${proy>=0?"ganancia":"pérdida"} de ${fmt(Math.abs(proy))}.`:"Cobrado completo."}
         ${e.gastos_detalle.length?`<br>Gastos: ${e.gastos_detalle.map(g=>`${esc(g.categoria)} ${fmt(g.monto)}`).join(" · ")}`:""}</div>
@@ -677,8 +707,9 @@ function tabReportes(){
     ${c.egresos_generales>0?`<div class="muted small">Además hay ${fmt(c.egresos_generales)} en gastos generales (no asignados a un evento).</div>`:""}
   </div>
   <div class="card"><h2>${I("heart")} Aporte anual</h2>
-    <div class="row small"><span class="muted">Cobrado ${fmt(r.cobrado_aportes)} de ${fmt(r.aporte_comprometido)}</span><b>${pct(r.cobrado_aportes, r.aporte_comprometido)}%</b></div>
-    <div class="prog"><span style="width:${pct(r.cobrado_aportes, r.aporte_comprometido)}%"></span></div>
+    <div class="row small"><span class="muted">Cobrado ${fmt(apCob)} de ${fmt(r.aporte_comprometido)}</span><b>${pct(apCob, r.aporte_comprometido)}%</b></div>
+    <div class="prog"><span style="width:${pct(apCob, r.aporte_comprometido)}%"></span></div>
+    ${apCred>0?`<div class="muted small">Incluye ${fmt(apCred)} que vienen de ventas de eventos.</div>`:""}
     <div class="muted small">Falta cobrar ${fmt(r.aporte_falta_anio)} para cerrar el año. Van ${r.meses_vencidos} de ${r.cantidad_meses} cuotas.</div></div>
   <div class="card"><h2>${I("book")} Libro diario</h2>
     <div class="muted small">Últimos movimientos. El libro completo está en la planilla de Drive (Gestión → Libro en Drive).</div>
@@ -695,6 +726,173 @@ function tabReportes(){
     <div class="stats"><div class="stat"><span class="muted tiny">Cobrado en efectivo</span><b>${fmt(c.ingresos_efectivo)}</b></div>
     <div class="stat"><span class="muted tiny">Gastado en efectivo</span><b>${fmt(c.egresos_efectivo)}</b></div>
     <div class="stat"><span class="muted tiny">Debería haber en efectivo</span><b>${fmt(c.ingresos_efectivo - c.egresos_efectivo)}</b></div></div></div>`;
+}
+
+// ===== QR =====
+function qrSVG(texto){
+  try{ const q = qrcode(0, "M"); q.addData(texto); q.make(); return q.createSvgTag({cellSize:8, margin:2, scalable:true}); }
+  catch(_){ return `<div class="muted small" style="color:#333;text-align:center;word-break:break-all">No se pudo dibujar el QR. Código: ${esc(texto)}</div>`; }
+}
+
+// ===== Mi asistencia (dirigente) =====
+function vistaMiAsistencia(){
+  const d = S.data, a = S.asis, m = d.cuenta.miembro;
+  if(!a) return cabecera(m.nombre, `${d.parroquia} · ${d.anio}`) + `<div class="card">No se pudo cargar tu asistencia. Probá de nuevo más tarde.</div>`;
+  const pc = a.total ? Math.round(a.presentes / a.total * 100) : 0;
+  return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
+  <div class="card" style="align-items:center;text-align:center">
+    <h2 style="align-self:flex-start">${I("check")} Mi QR de asistencia</h2>
+    <div class="qrbox">${qrSVG(a.qr)}</div>
+    <div class="muted small">Mostralo cuando llegues a la escuela de dirigentes o a un evento. Subí el brillo de la pantalla si cuesta leerlo.</div>
+  </div>
+  <div class="card">
+    <div class="row"><div><div class="muted small">Mi asistencia</div><div class="bigpct num">${a.total?pc+"%":"—"}</div></div>
+      <div style="text-align:right"><div class="t" style="font-weight:800">${a.presentes} de ${a.total}</div><div class="muted small">reuniones y eventos</div></div></div>
+    ${a.total?`<div class="prog"><span style="width:${pc}%"></span></div>`:""}
+    ${a.por_tipo.map(t=>`<div class="row small"><span>${esc(t.tipo)}</span><b class="num">${t.presentes} de ${t.total}</b></div>`).join("")}
+  </div>
+  <div class="card"><h2>${I("clock")} Historial</h2><div class="list">${a.reuniones.length ? a.reuniones.map(r=>`
+    <div class="item"><div class="ic ${r.presente?"ok":"bad"}">${I(r.presente?"check":"x")}</div>
+      <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}${r.hora?` · llegaste ${r.hora}`:""}</div></div>
+      <span class="pill ${r.presente?"ok":"bad"}">${r.presente?"Presente":"Ausente"}</span></div>`).join("")
+    : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no se tomó asistencia.</div>`}</div></div>`;
+}
+
+// ===== Asistencia (quien la toma) =====
+const TIPOS_REU = ["Escuela de dirigentes","Reunión","Evento","Retiro","Misa"];
+function tabAsistencia(){
+  const R = S.reus;
+  const ranking = R.por_dirigente.filter(x=>x.total>0).map(x=>({...x, pc: Math.round(x.presentes/x.total*100)})).sort((a,b)=>a.pc-b.pc||a.nombre.localeCompare(b.nombre));
+  return `
+  <div class="hero">
+    <div class="lbl">Asistencia</div>
+    <div class="big num">${R.reuniones.length}</div>
+    <span class="chip">${R.reuniones.length===1?"reunión o evento registrado":"reuniones y eventos registrados"}</span>
+    <button class="btn block" data-nueva-reu>${I("plus")} Nueva reunión o evento</button>
+  </div>
+  <div class="card"><h2>${I("clock")} Reuniones y eventos</h2><div class="list">${R.reuniones.length ? R.reuniones.map(r=>`
+    <div class="item" style="flex-wrap:wrap"><div class="ic ok">${I("check")}</div>
+      <div class="l"><div class="t">${esc(r.nombre)}</div><div class="muted small">${r.fecha} · ${esc(r.tipo)}</div></div>
+      <div style="text-align:right"><div class="num" style="font-weight:900;font-size:1.1rem">${r.presentes}<span class="muted small"> / ${r.esperados}</span></div><div class="muted tiny">presentes</div></div>
+      <div class="actions" style="width:100%"><button class="btn sm" data-escanear="${r.id}">${I("check","sm")} Tomar asistencia</button>
+        <button class="btn soft sm" data-lista-reu="${r.id}">${I("users","sm")} Ver lista</button>
+        <button class="btn ghost sm" data-anular-reu="${r.id}">${I("x","sm")} Anular</button></div></div>`).join("")
+    : `<div class="empty"><div class="ic">${I("check")}</div>Creá la primera reunión para empezar a tomar asistencia.</div>`}</div></div>
+  ${ranking.length?`<div class="card"><h2>${I("users")} Asistencia por dirigente</h2>
+    <div class="muted small">De menor a mayor asistencia.</div>
+    <div class="list">${ranking.map(x=>`<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div class="row"><span class="t">${esc(x.nombre)}</span><span class="small num"><b class="${x.pc<60?"debt":x.pc<80?"":"paid"}">${x.pc}%</b> <span class="muted">· ${x.presentes} de ${x.total}</span></span></div>
+      <div class="prog"><span style="width:${x.pc}%;${x.pc<60?"background:var(--bad)":x.pc<80?"background:var(--sun)":""}"></span></div></div>`).join("")}</div></div>`:""}`;
+}
+function hojaReunion(){
+  const tipos = [...new Set([...TIPOS_REU, ...(S.reus?.tipos||[])])];
+  abrirHoja(`<h2>Nueva reunión o evento</h2>
+    <label>Tipo<select id="rTipo">${tipos.map(t=>`<option>${esc(t)}</option>`).join("")}</select></label>
+    <label>Nombre<input id="rNom" value="Escuela de dirigentes"></label>
+    <label>Fecha<input id="rFecha" type="date" value="${hoyISO()}"></label>
+    <div class="err" id="rErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="rOk">${I("check")} Crear y tomar asistencia</button></div>`,
+  (s, cerrar)=>{
+    const tipo = s.querySelector("#rTipo"), nom = s.querySelector("#rNom");
+    tipo.onchange = ()=>{ if(!nom.dataset.tocado) nom.value = tipo.value; };
+    nom.oninput = ()=> nom.dataset.tocado = "1";
+    const b = s.querySelector("#rOk"); b.onclick = () => ocupado(b, async()=>{
+      try{ const r = await rpc("crear_reunion",{p_codigo:S.codigo,p_nombre:nom.value,p_tipo:tipo.value,p_fecha:s.querySelector("#rFecha").value||null});
+        cerrar(); await recargar(); abrirEscaner(r.id);
+      }catch(e){ const er=s.querySelector("#rErr"); er.textContent=e.message; er.hidden=false; } });
+  });
+}
+async function cargarJsQR(){
+  if(window.jsQR) return;
+  await new Promise((res, rej)=>{ const sc=document.createElement("script"); sc.src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"; sc.onload=res; sc.onerror=()=>rej(new Error("No se pudo cargar el lector de QR")); document.head.appendChild(sc); });
+}
+let audioCtx;
+function pip(ok){
+  try{ navigator.vibrate && navigator.vibrate(ok?80:[60,60,60]); }catch(_){}
+  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.frequency.value = ok?880:220; g.gain.value=.08; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.12); }catch(_){}
+}
+function abrirEscaner(rid){
+  const reu = S.reus.reuniones.find(r=>r.id===rid) || {nombre:"Reunión", fecha:"", presentes:0, esperados:0};
+  let stream = null, vivo = true, ultimo = "", ultimoT = 0, ocupadoQR = false, detector = null;
+  const cerrarHoja = abrirHoja(`<h2>${esc(reu.nombre)}</h2><div class="muted small">${reu.fecha} · Apuntá la cámara al QR de cada dirigente. Podés escanear uno tras otro.</div>
+    <div class="scan" id="scanBox"><video id="scanVid" playsinline muted></video><div class="mira"></div></div>
+    <div class="ultimo estado neutral" id="scanMsg">Iniciando cámara…</div>
+    <div class="row"><span class="muted small">Presentes</span><b class="num" style="font-size:1.4rem" id="scanCnt">${reu.presentes} / ${reu.esperados}</b></div>
+    <div class="actions"><button class="btn soft" id="scanLista">${I("users")} Marcar a mano</button><button class="btn" data-cerrar>${I("check")} Terminar</button></div>`,
+  async (s)=>{
+    const vid = s.querySelector("#scanVid"), box = s.querySelector("#scanBox"), msg = s.querySelector("#scanMsg"), cnt = s.querySelector("#scanCnt");
+    s.querySelector("#scanLista").onclick = ()=>{ parar(); cerrarHoja(); abrirListaReunion(rid); };
+    const aviso = (cls, txt) => { msg.className = "ultimo estado " + cls; msg.innerHTML = txt; box.classList.remove("ok","bad"); if(cls!=="neutral") box.classList.add(cls==="ok"?"ok":"bad"); };
+    try{
+      if(!navigator.mediaDevices?.getUserMedia) throw new Error("Este navegador no permite usar la cámara. Usá Marcar a mano.");
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}, audio:false});
+      vid.srcObject = stream; await vid.play();
+      if("BarcodeDetector" in window){ try{ detector = new BarcodeDetector({formats:["qr_code"]}); }catch(_){ detector = null; } }
+      if(!detector) await cargarJsQR();
+      aviso("neutral", "Listo: mostrá un QR");
+    }catch(e){
+      aviso("bad", esc(e.name==="NotAllowedError" ? "Permití el uso de la cámara en el navegador (ícono del candado, arriba) o usá Marcar a mano." : e.message)); return;
+    }
+    const cv = document.createElement("canvas"), cx = cv.getContext("2d", {willReadFrequently:true});
+    const leer = async () => {
+      if(!vivo) return;
+      if(!ocupadoQR && vid.readyState >= 2){
+        let txt = null;
+        try{
+          if(detector){ const r = await detector.detect(vid); if(r[0]) txt = r[0].rawValue; }
+          else { const w = 480, h = Math.round(vid.videoHeight / vid.videoWidth * w) || 480; cv.width = w; cv.height = h; cx.drawImage(vid, 0, 0, w, h);
+            const img = cx.getImageData(0, 0, w, h); const r = jsQR(img.data, w, h, {inversionAttempts:"dontInvert"}); if(r) txt = r.data; }
+        }catch(_){}
+        const ahora = Date.now();
+        if(txt && !(txt===ultimo && ahora-ultimoT<3000)){
+          ultimo = txt; ultimoT = ahora; ocupadoQR = true;
+          try{ const r = await rpc("registrar_qr",{p_codigo:S.codigo,p_reunion:rid,p_qr:txt});
+            pip(true); aviso("ok", `${I("check","sm")} ${esc(r.nombre)} ${r.nuevo?"presente":"ya estaba registrado"}`); cnt.textContent = `${r.presentes} / ${reu.esperados}`;
+          }catch(e){ pip(false); aviso("bad", esc(e.message)); }
+          ocupadoQR = false;
+        }
+      }
+      setTimeout(leer, 160);
+    };
+    leer();
+  });
+  function parar(){ vivo = false; if(stream) stream.getTracks().forEach(t=>t.stop()); }
+  const obs = new MutationObserver(()=>{ if(!document.getElementById("scanBox")){ parar(); obs.disconnect(); recargar().catch(()=>{}); } });
+  obs.observe($("sheetRoot"), {childList:true, subtree:true});
+}
+async function abrirListaReunion(rid){
+  let d;
+  try{ d = await rpc("reunion_detalle",{p_codigo:S.codigo,p_reunion:rid}); }catch(e){ toast(e.message); return; }
+  const pres = () => d.dirigentes.filter(x=>x.presente).length;
+  abrirHoja(`<h2>${esc(d.nombre)}</h2><div class="muted small">${d.fecha} · ${esc(d.tipo)} · tocá un nombre para marcarlo presente o ausente.</div>
+    <div class="row"><span class="muted small">Presentes</span><b class="num" style="font-size:1.3rem" id="lCnt">${pres()} / ${d.dirigentes.length}</b></div>
+    <div class="list" id="lLista">${d.dirigentes.map(x=>`<label class="check"><input type="checkbox" value="${x.id}" ${x.presente?"checked":""}>
+      <span style="flex:1">${esc(x.nombre)}<br><span class="muted tiny">${x.presente?(x.metodo==="qr"?`QR · ${x.hora}`:`A mano · ${x.hora}`):"Ausente"}</span></span></label>`).join("")}</div>
+    <div class="actions"><button class="btn soft" id="lEsc">${I("check")} Volver al escáner</button><button class="btn" data-cerrar>Listo</button></div>`,
+  (s, cerrar)=>{
+    s.querySelector("#lEsc").onclick = ()=>{ cerrar(); abrirEscaner(rid); };
+    s.querySelector("#lLista").onchange = async ev => {
+      const cb = ev.target; if(cb.type!=="checkbox") return; cb.disabled = true;
+      try{ const r = await rpc("marcar_asistencia",{p_codigo:S.codigo,p_reunion:rid,p_miembro:Number(cb.value),p_presente:cb.checked});
+        const it = d.dirigentes.find(x=>x.id===Number(cb.value)); it.presente = cb.checked;
+        cb.parentElement.querySelector(".tiny").textContent = cb.checked ? "A mano · ahora" : "Ausente";
+        s.querySelector("#lCnt").textContent = `${r.presentes} / ${d.dirigentes.length}`;
+      }catch(e){ cb.checked = !cb.checked; toast(e.message); }
+      cb.disabled = false;
+    };
+  });
+  const obs = new MutationObserver(()=>{ if(!document.getElementById("lLista")){ obs.disconnect(); if(!document.getElementById("scanBox")) recargar().catch(()=>{}); } });
+  obs.observe($("sheetRoot"), {childList:true, subtree:true});
+}
+function montarAsistencia(){
+  const m = $("vMain");
+  const n = m.querySelector("[data-nueva-reu]"); if(n) n.onclick = hojaReunion;
+  m.querySelectorAll("[data-escanear]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirEscaner(Number(b.dataset.escanear)); });
+  m.querySelectorAll("[data-lista-reu]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirListaReunion(Number(b.dataset.listaReu)); });
+  m.querySelectorAll("[data-anular-reu]").forEach(b=> b.onclick = async e=>{ e.stopPropagation();
+    if(!await confirmar("¿Anular esta reunión?","Deja de contar en la asistencia de todos los dirigentes.","Anular")) return;
+    ocupado(b, async()=>{ try{ await rpc("anular_reunion",{p_codigo:S.codigo,p_reunion:Number(b.dataset.anularReu)}); await recargar(); toast("Reunión anulada"); }catch(er){ toast(er.message) } }); });
 }
 
 // ===== Gastos =====
@@ -838,7 +1036,9 @@ function montarExtras(){
 // ===== Recibo =====
 function textoRecibo(r){
   const det = r.cuenta.conceptos.filter(c=>c.saldo>0).map(c=>`• ${c.nombre}: ${fmt(c.saldo)}`).join("\n");
-  return `*${r.parroquia}* · Recibo N° ${r.recibo_nro}\n${r.miembro}\nFecha: ${r.fecha} · ${r.medio}\nConcepto: ${r.concepto}\nMonto recibido: *${fmt(r.monto)}*\n\nSaldo pendiente: ${fmt(r.cuenta.saldo)}` +
+  return `*${r.parroquia}* · Recibo N° ${r.recibo_nro}\n${r.miembro}\nFecha: ${r.fecha} · ${r.medio}\nConcepto: ${r.concepto}\nMonto recibido: *${fmt(r.monto)}*` +
+    (r.pct_aporte>0 ? `\nSe suma a tu aporte: ${fmt(r.monto*r.pct_aporte/100)} (${pctTxt(r.pct_aporte)})` : "") +
+    `\n\nSaldo pendiente: ${fmt(r.cuenta.saldo)}` +
     (det ? "\n"+det : "\n¡Estás al día! Gracias.") +
     `\n\nAporte anual: ${estadoAporte(r.cuenta.aporte).txt}\nFalta para cancelar el año: ${fmt(r.cuenta.aporte.falta_anio)}` +
     `\n\nTu cuenta y carga de comprobantes:\n${linkPersonal(r.cuenta.miembro.codigo)}`;
@@ -911,17 +1111,26 @@ function hojaMiembro(m){
       cerrar(); await recargar(); toast("Dirigente guardado"); if(!m) hojaLink(r.nombre, r.celular, r.codigo, false);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
 }
+function pctEv(e){ if(!e) return 0; const r = (S.caja?.eventos||[]).find(x=>x.id===e.id); return r ? Number(r.pct_aporte)||0 : 0; }
 function hojaEvento(e){
   abrirHoja(`<h2>${e?"Editar evento":"Nuevo evento"}</h2>
     <label>Nombre<input id="fNom" placeholder="Ej.: Locro 9 de Julio" value="${esc(e?.nombre||"")}"></label>
     <div class="grid2"><label>Se vende por (singular)<input id="fU" placeholder="porción, número, bono" value="${esc(e?.unidad||"")}"></label>
     <label>Plural<input id="fUP" placeholder="porciones, números, bonos" value="${esc(e?.unidad_plural||"")}"></label></div>
     <label>Precio por unidad ($)<input id="fP" type="number" inputmode="numeric" min="0" value="${e?Math.round(e.precio):""}"></label>
+    <label>¿Qué parte de lo que vende cada dirigente se suma a su aporte?
+      <div class="filters" id="fPctBtns" style="margin-top:4px">${[0,50,100].map(v=>`<button type="button" data-pct="${v}" aria-pressed="false">${v===0?"Nada":v+"%"}</button>`).join("")}</div>
+      <input id="fPct" type="number" inputmode="numeric" min="0" max="100" value="${pctEv(e)}" style="margin-top:6px"></label>
+    <div class="muted small">Ejemplo: con 50%, si un dirigente paga $ 10.000 de este evento, $ 5.000 se descuentan de sus cuotas de aporte.</div>
     ${e?`<div class="muted small">Si cambiás el precio, vale para las próximas entregas. Lo ya entregado mantiene su precio.</div>`:""}
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
-  (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
-    try{ await rpc("guardar_evento",{p_codigo:S.codigo,p_id:e?.id??null,p_nombre:s.querySelector("#fNom").value,p_unidad:s.querySelector("#fU").value,p_unidad_plural:s.querySelector("#fUP").value,p_precio:Number(s.querySelector("#fP").value)});
+  (s, cerrar)=>{
+    const pi = s.querySelector("#fPct"), marcar = ()=> s.querySelectorAll("[data-pct]").forEach(x=>x.setAttribute("aria-pressed", String(Number(x.dataset.pct)===Number(pi.value))));
+    s.querySelector("#fPctBtns").onclick = ev => { const x = ev.target.closest("[data-pct]"); if(!x) return; ev.preventDefault(); pi.value = x.dataset.pct; marcar(); };
+    pi.oninput = marcar; marcar();
+    const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
+    try{ await rpc("guardar_evento",{p_codigo:S.codigo,p_id:e?.id??null,p_nombre:s.querySelector("#fNom").value,p_unidad:s.querySelector("#fU").value,p_unidad_plural:s.querySelector("#fUP").value,p_precio:Number(s.querySelector("#fP").value),p_pct:Number(pi.value)||0});
       cerrar(); await recargar(); toast("Evento guardado");
     }catch(er){ const x=s.querySelector("#fErr"); x.textContent=er.message; x.hidden=false; } }); });
 }
@@ -977,6 +1186,12 @@ function montarTesorero(){
     if(ds.bajaTes){ const t=P.tesoreros.find(x=>x.id==ds.bajaTes), act = ds.activo==="true";
       if(act && !await confirmar(`¿Dar de baja a ${t.nombre}?`, `Su código deja de funcionar y sus ${t.miembros} dirigentes quedan sin tesorero hasta que los asignes a otro.`, "Dar de baja")) return;
       return ocupado(b, async()=>{ try{ const r=await rpc("set_tesorero_activo",{p_codigo:S.codigo,p_id:t.id,p_activo:!act}); await recargar(); toast(act?`Dado de baja. ${r.liberados} dirigentes quedaron sin tesorero.`:"Reactivado"); }catch(er){ toast(er.message) } }); }
+    if(ds.asisPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.asisPerm);
+      return ocupado(b, async()=>{ try{ await rpc("set_puede_asistencia",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede tomar asistencia`); }catch(er){ toast(er.message) } }); }
+    if(ds.verQr){ const x=P.miembros.find(y=>y.id==ds.verQr);
+      return ocupado(b, async()=>{ try{ const q = await rpc("qr_de",{p_codigo:S.codigo,p_miembro:x.id});
+        abrirHoja(`<h2>QR de ${esc(x.nombre)}</h2><div class="qrbox">${qrSVG(q)}</div><div class="muted small">Sirve para tomarle asistencia si no tiene el celular: sacale una captura o imprimilo.</div><button class="btn soft" data-cerrar>Cerrar</button>`);
+      }catch(er){ toast(er.message) } }); }
     if(ds.gastoPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.gastoPerm);
       if(!tiene && !await confirmar(`¿Permitir que ${t.nombre} cargue gastos?`, "Va a poder cargar gastos y anular los que cargue. Los demás tesoreros los ven, pero no pueden cargar.", "Permitir", "")) return;
       return ocupado(b, async()=>{ try{ await rpc("set_puede_gastar",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede cargar gastos`); }catch(er){ toast(er.message) } }); }
