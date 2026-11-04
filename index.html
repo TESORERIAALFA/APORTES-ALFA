@@ -130,6 +130,10 @@ input:focus,select:focus{border-color:var(--brand);outline:none}
 @media (max-width:440px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}}
 .stat{background:var(--bg);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat b{font-size:1.1rem;font-weight:900;font-variant-numeric:tabular-nums}
+.stat-btn{border:0;text-align:left;cursor:pointer;color:inherit;font:inherit;box-shadow:inset 0 0 0 1.5px transparent;transition:box-shadow .15s}
+.stat-btn .ver{color:var(--brand);font-weight:800}
+.stat-btn.on,.stat-btn:hover{box-shadow:inset 0 0 0 1.5px var(--brand)}
+.fdet{background:var(--bg);border-radius:14px;padding:4px 12px 8px}
 .prog{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
 .prog span{display:block;height:100%;background:var(--ok);border-radius:99px}
 
@@ -875,7 +879,27 @@ async function hojaHistorial(mid){
 
 // ===== Ficha del dirigente =====
 const fechaAR = iso => iso ? iso.split("-").reverse().join("/") : "";
+const porFecha = xs => [...(xs||[])].sort((a,c)=>String(c.fecha||"").localeCompare(String(a.fecha||"")));
+function equiposHTML(xs){
+  xs = porFecha(xs);
+  return xs.length ? `<div class="list">${xs.map(e=>`<div class="item" style="padding:8px 0"><div class="ic" style="width:32px;height:32px">${I("users","sm")}</div><div class="l"><div class="t">${e.alfa?`Alfa ${esc(e.alfa)} · `:""}${esc(e.equipo||"Equipo")}</div>${e.fecha?`<div class="muted tiny">${fechaAR(e.fecha)}</div>`:""}</div></div>`).join("")}</div>`
+    : `<div class="muted small">Todavía no hay equipos cargados.</div>`;
+}
+function mensajesHTML(xs){
+  xs = porFecha(xs);
+  return xs.length ? `<div class="list">${xs.map(m=>`<div class="item" style="padding:8px 0"><div class="ic sun" style="width:32px;height:32px">${I("msg","sm")}</div><div class="l"><div class="t">${esc(m.tema||"Mensaje")}</div>${m.fecha||m.lugar?`<div class="muted tiny">${[fechaAR(m.fecha), m.lugar?esc(m.lugar):""].filter(Boolean).join(" · ")}</div>`:""}</div></div>`).join("")}</div>`
+    : `<div class="muted small">Todavía no hay mensajes cargados.</div>`;
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-lista]"); if(!b) return;
+  const caja = b.closest(".fgrid").parentElement, det = caja.querySelector(`[data-det="${b.dataset.lista}"]`); if(!det) return;
+  const abrir = det.hidden;
+  caja.querySelectorAll("[data-det]").forEach(d=> d.hidden = true);
+  caja.querySelectorAll("[data-lista]").forEach(x=> x.classList.remove("on"));
+  if(abrir){ det.hidden = false; b.classList.add("on"); det.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+});
 function fichaHTML(f){
+  const boton = (id, k, v) => `<button type="button" class="stat stat-btn" data-lista="${id}"><span class="muted tiny">${k} <span class="ver">ver ›</span></span><b>${v||0}</b></button>`;
   const dato = (k, v, vacio="—") => `<div class="stat"><span class="muted tiny">${k}</span><b>${v===null||v===undefined||v===""?`<span class="muted">${vacio}</span>`:v}</b></div>`;
   const lista = (titulo, xs) => `<h3>${titulo} <span class="muted small">(${xs.length})</span></h3>${xs.length?`<div class="list">${xs.map(c=>`<div class="item" style="padding:8px 0"><div class="ic ok" style="width:32px;height:32px">${I("check","sm")}</div><div class="l">${esc(c)}</div></div>`).join("")}</div>`:`<div class="muted small">Ninguno cargado.</div>`}`;
   return `
@@ -884,9 +908,11 @@ function fichaHTML(f){
       ${dato("Fecha de jornada", fechaAR(f.fecha_jornada))}
       ${dato("Edad", f.edad!==null?`${f.edad} años`:"", "Sin fecha de nac.")}
       ${dato("Meses de rodaje", f.meses_rodaje!==null?`${f.meses_rodaje}`:"", "Sin fecha")}
-      ${dato("Equipos", f.equipos)}
-      ${dato("Mensajes dados", f.mensajes)}
+      ${boton("equipos","Equipos", f.equipos)}
+      ${boton("mensajes","Mensajes dados", f.mensajes)}
     </div>
+    <div class="fdet" data-det="equipos" hidden><h3>Equipos en los que sirvió</h3>${equiposHTML(f.equipos_lista)}</div>
+    <div class="fdet" data-det="mensajes" hidden><h3>Mensajes dados</h3>${mensajesHTML(f.mensajes_lista)}</div>
     <div class="row small"><span class="muted">DNI</span><b class="num">${f.dni?esc(f.dni):"—"}</b></div>
     ${f.fecha_nacimiento?`<div class="row small"><span class="muted">Fecha de nacimiento</span><b class="num">${fechaAR(f.fecha_nacimiento)}</b></div>`:""}
     ${f.meses_rodaje!==null?`<div class="muted tiny">El rodaje se cuenta desde ${f.rodaje_desde==="inicio"?`el ${fechaAR(f.inicio_rodaje)} (inicio del rodaje)`:`la jornada (${fechaAR(f.fecha_jornada)})`}. Edad y rodaje se actualizan solos.</div>`:""}
@@ -910,8 +936,10 @@ async function hojaFicha(mid){
 function hojaEditarFicha(f){
   const ci = [...(f.cursos_intensivos||[])], ce = [...(f.cursos_extensivos||[])];
   const listaEd = (id, xs) => xs.map((c,i)=>`<div class="item" style="padding:6px 0"><div class="l">${esc(c)}</div><button class="btn ghost sm" data-quitar="${id}:${i}" aria-label="Quitar">${I("x","sm")}</button></div>`).join("") || `<div class="muted small">Ninguno.</div>`;
-  const contador = (id, label, v) => `<label>${label}<div style="display:flex;gap:8px"><button class="btn soft sm" type="button" data-menos="${id}">−</button>
-    <input id="${id}" type="number" inputmode="numeric" min="0" value="${v||0}" style="text-align:center"><button class="btn soft sm" type="button" data-mas="${id}">+</button></div></label>`;
+  const eqs = (f.equipos_lista||[]).map(x=>({...x})), mss = (f.mensajes_lista||[]).map(x=>({...x}));
+  const fila = (id, i, txt, sub) => `<div class="item" style="padding:6px 0"><div class="l"><div>${txt}</div>${sub?`<div class="muted tiny">${sub}</div>`:""}</div><button class="btn ghost sm" type="button" data-quitar="${id}:${i}" aria-label="Quitar">${I("x","sm")}</button></div>`;
+  const listaEq = () => eqs.map((e,i)=>fila("eq", i, `${e.alfa?`Alfa ${esc(e.alfa)} · `:""}${esc(e.equipo||"Equipo")}`, fechaAR(e.fecha))).join("") || `<div class="muted small">Ninguno.</div>`;
+  const listaMs = () => mss.map((m,i)=>fila("ms", i, esc(m.tema||"Mensaje"), [fechaAR(m.fecha), m.lugar?esc(m.lugar):""].filter(Boolean).join(" · "))).join("") || `<div class="muted small">Ninguno.</div>`;
   abrirHoja(`<h2>Ficha de ${esc(f.nombre)}</h2>
     <div class="grid2"><label>N° de Alfa<input id="fiAlfa" inputmode="numeric" value="${esc(f.numero_alfa||"")}" placeholder="Ej.: 42"></label>
     <label>DNI<input id="fiDni" inputmode="numeric" value="${esc(f.dni||"")}" placeholder="Sin puntos"></label></div>
@@ -919,7 +947,13 @@ function hojaEditarFicha(f){
     <label>Fecha de nacimiento<input id="fiNac" type="date" value="${f.fecha_nacimiento||""}"></label></div>
     <label>Inicio del rodaje (opcional)<input id="fiRod" type="date" value="${f.inicio_rodaje||""}"></label>
     <div class="muted small">Si dejás el inicio del rodaje vacío, los meses se cuentan desde la jornada.</div>
-    <div class="grid2">${contador("fiEq","Equipos",f.equipos)}${contador("fiMsj","Mensajes dados",f.mensajes)}</div>
+    <h3>Equipos <span class="muted small">(Alfa en el que sirvió y equipo)</span></h3><div class="list" id="fiEQ">${listaEq()}</div>
+    <div class="grid2"><input id="fiEqAlfa" inputmode="numeric" placeholder="N° de Alfa"><input id="fiEqNom" placeholder="Equipo (ej.: Cocina)"></div>
+    <div style="display:flex;gap:8px"><input id="fiEqFecha" type="date" aria-label="Fecha (opcional)" title="Fecha (opcional)"><button class="btn soft sm" type="button" data-agregar="eq">${I("plus","sm")} Agregar</button></div>
+    <h3>Mensajes dados</h3><div class="list" id="fiMS">${listaMs()}</div>
+    <input id="fiMsTema" placeholder="Tema del mensaje">
+    <div class="grid2"><input id="fiMsFecha" type="date" aria-label="Fecha" title="Fecha"><input id="fiMsLugar" placeholder="Dónde (ej.: Alfa 46)"></div>
+    <button class="btn soft sm" type="button" data-agregar="ms">${I("plus","sm")} Agregar mensaje</button>
     <h3>Cursos intensivos</h3><div class="list" id="fiCI">${listaEd("ci",ci)}</div>
     <div style="display:flex;gap:8px"><input id="fiCInuevo" placeholder="Nombre del curso intensivo"><button class="btn soft sm" type="button" data-agregar="ci">${I("plus","sm")}</button></div>
     <h3>Cursos extensivos</h3><div class="list" id="fiCE">${listaEd("ce",ce)}</div>
@@ -927,20 +961,24 @@ function hojaEditarFicha(f){
     <div class="err" id="fiErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fiOk">${I("check")} Guardar ficha</button></div>`,
   (s, cerrar)=>{
-    const pintar = ()=>{ s.querySelector("#fiCI").innerHTML = listaEd("ci",ci); s.querySelector("#fiCE").innerHTML = listaEd("ce",ce); };
-    const agregar = id => { const inp = s.querySelector(id==="ci"?"#fiCInuevo":"#fiCEnuevo"); const v = inp.value.trim(); if(!v) return; (id==="ci"?ci:ce).push(v); inp.value=""; pintar(); inp.focus(); };
+    const pintar = ()=>{ s.querySelector("#fiCI").innerHTML = listaEd("ci",ci); s.querySelector("#fiCE").innerHTML = listaEd("ce",ce);
+      s.querySelector("#fiEQ").innerHTML = listaEq(); s.querySelector("#fiMS").innerHTML = listaMs(); };
+    const val = id => s.querySelector(id).value.trim(), vaciar = (...ids) => ids.forEach(id=> s.querySelector(id).value = "");
+    const agregarEq = () => { if(!val("#fiEqAlfa") && !val("#fiEqNom")) return; eqs.push({alfa:val("#fiEqAlfa"), equipo:val("#fiEqNom"), fecha:val("#fiEqFecha")}); vaciar("#fiEqAlfa","#fiEqNom","#fiEqFecha"); pintar(); };
+    const agregarMs = () => { if(!val("#fiMsTema")) return; mss.push({tema:val("#fiMsTema"), fecha:val("#fiMsFecha"), lugar:val("#fiMsLugar")}); vaciar("#fiMsTema","#fiMsFecha","#fiMsLugar"); pintar(); };
+    const agregar = id => { if(id==="eq") return agregarEq(); if(id==="ms") return agregarMs(); const inp = s.querySelector(id==="ci"?"#fiCInuevo":"#fiCEnuevo"); const v = inp.value.trim(); if(!v) return; (id==="ci"?ci:ce).push(v); inp.value=""; pintar(); inp.focus(); };
     s.addEventListener("click", ev=>{
       const b = ev.target.closest("button"); if(!b) return;
       if(b.dataset.agregar) agregar(b.dataset.agregar);
-      if(b.dataset.quitar){ const [id,i] = b.dataset.quitar.split(":"); (id==="ci"?ci:ce).splice(Number(i),1); pintar(); }
-      if(b.dataset.mas||b.dataset.menos){ const inp = s.querySelector("#"+(b.dataset.mas||b.dataset.menos)); inp.value = Math.max(0,(Number(inp.value)||0)+(b.dataset.mas?1:-1)); }
+      if(b.dataset.quitar){ const [id,i] = b.dataset.quitar.split(":"); ({ci,ce,eq:eqs,ms:mss})[id].splice(Number(i),1); pintar(); }
     });
     ["#fiCInuevo","#fiCEnuevo"].forEach(sel=> s.querySelector(sel).onkeydown = ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); agregar(sel==="#fiCInuevo"?"ci":"ce"); } });
     const ok = s.querySelector("#fiOk"); ok.onclick = () => ocupado(ok, async()=>{
       try{
         const pend = [["#fiCInuevo",ci],["#fiCEnuevo",ce]]; pend.forEach(([sel,arr])=>{ const v=s.querySelector(sel).value.trim(); if(v) arr.push(v); });
+        agregarEq(); agregarMs();
         await rpc("guardar_ficha",{p_codigo:S.codigo,p_miembro:f.id,p_datos:{numero_alfa:s.querySelector("#fiAlfa").value,fecha_jornada:s.querySelector("#fiJor").value,
-          fecha_nacimiento:s.querySelector("#fiNac").value,inicio_rodaje:s.querySelector("#fiRod").value,equipos:s.querySelector("#fiEq").value,mensajes:s.querySelector("#fiMsj").value,
+          fecha_nacimiento:s.querySelector("#fiNac").value,inicio_rodaje:s.querySelector("#fiRod").value,equipos_lista:eqs,mensajes_lista:mss,
           cursos_intensivos:ci,cursos_extensivos:ce}});
         if((s.querySelector("#fiDni").value||"").replace(/\D/g,"") !== (f.dni||"")) await rpc("set_dni",{p_codigo:S.codigo,p_tipo:"miembro",p_id:f.id,p_dni:s.querySelector("#fiDni").value});
         cerrar(); await recargar(); toast("Ficha guardada"); hojaFicha(f.id);
@@ -952,11 +990,13 @@ async function exportarFichas(){
   try{
     await cargarXLSX();
     const d = await rpc("export_fichas",{p_codigo:S.codigo});
-    const cab = ["Dirigente","DNI","Fecha de nacimiento","Edad","N° de Alfa","Fecha de jornada","Inicio del rodaje","Meses de rodaje","Equipos","Mensajes dados","Cursos intensivos","Cant. intensivos","Cursos extensivos","Cant. extensivos","Tesorero","Celular"];
+    const cab = ["Dirigente","DNI","Fecha de nacimiento","Edad","N° de Alfa","Fecha de jornada","Inicio del rodaje","Meses de rodaje","Equipos","Detalle de equipos","Mensajes dados","Detalle de mensajes","Cursos intensivos","Cant. intensivos","Cursos extensivos","Cant. extensivos","Tesorero","Celular"];
     const filas = [[`Fichas de dirigentes · ${d.parroquia}`],[`Generado el ${d.generado}`],[], cab,
       ...d.fichas.map(f=>[f.nombre, f.dni||"", fechaAR(f.fecha_nacimiento), f.edad??"", f.numero_alfa||"", fechaAR(f.fecha_jornada), fechaAR(f.inicio_rodaje), f.meses_rodaje??"",
-        f.equipos, f.mensajes, (f.cursos_intensivos||[]).join(", "), (f.cursos_intensivos||[]).length, (f.cursos_extensivos||[]).join(", "), (f.cursos_extensivos||[]).length, f.tesorero||"", f.celular||""])];
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaXLSX(filas, [24,12,14,6,10,14,14,10,9,10,40,10,40,10,18,16]), "Fichas");
+        f.equipos, porFecha(f.equipos_lista).map(e=>`${e.alfa?"Alfa "+e.alfa+" · ":""}${e.equipo||""}`).join("; "),
+        f.mensajes, porFecha(f.mensajes_lista).map(m=>(m.tema||"")+(m.fecha||m.lugar?` (${[fechaAR(m.fecha),m.lugar].filter(Boolean).join(", ")})`:"")).join("; "),
+        (f.cursos_intensivos||[]).join(", "), (f.cursos_intensivos||[]).length, (f.cursos_extensivos||[]).join(", "), (f.cursos_extensivos||[]).length, f.tesorero||"", f.celular||""])];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaXLSX(filas, [24,12,14,6,10,14,14,10,9,40,10,50,40,10,40,10,18,16]), "Fichas");
     XLSX.writeFile(wb, `Fichas ${fechaArchivo()}.xlsx`); toast("Excel descargado");
   }catch(e){ toast(e.message); }
 }
