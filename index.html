@@ -162,6 +162,8 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 .empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;color:var(--muted);text-align:center}
 .empty .ic{width:48px;height:48px;border-radius:16px}
 .sec-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:6px 4px -4px}
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:440px){.fgrid{grid-template-columns:1fr 1fr}}
 .qrbox{background:#fff;border-radius:18px;padding:14px;align-self:center;width:min(78vw,300px);aspect-ratio:1;display:grid;place-items:center}
 .qrbox svg{width:100%;height:100%}
 .scan{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:1;width:100%;max-width:420px;align-self:center}
@@ -180,9 +182,9 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
   <section id="vLogin" class="login" hidden>
     <div class="logo"><svg class="ico"><use href="#i-heart"/></svg></div>
     <h1>Aportes de la parroquia</h1>
-    <div class="muted">Entrá con el código personal que te pasó tu tesorero. Si abriste tu link, entrás directo.</div>
+    <div class="muted">Entrá con tu DNI. Si abriste tu link personal, entrás directo.</div>
     <div class="card">
-      <label>Tu código<input id="inCodigo" autocomplete="off" autocapitalize="characters" placeholder="Ej.: AB3K-7QPZ"></label>
+      <label>Tu DNI (sin puntos)<input id="inCodigo" autocomplete="off" inputmode="numeric" placeholder="Ej.: 30123456"></label>
       <button class="btn block" id="btnEntrar">Entrar</button>
       <div class="err" id="loginErr" hidden></div>
     </div>
@@ -334,7 +336,7 @@ async function recargar(){
   render();
 }
 async function cargarExtras(){
-  if(S.data.tipo==="miembro"){ S.asis = await rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null); return; }
+  if(S.data.tipo==="miembro"){ [S.asis, S.ficha] = await Promise.all([rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null), rpc("mi_ficha",{p_codigo:S.codigo}).catch(()=>null)]); return; }
   if(S.data.tipo==="autoridad"){ S.reus = await rpc("reuniones_lista",{p_codigo:S.codigo}).catch(()=>null); S.gastos=null; S.kiosco=null; return; }
   const tareas = [rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
     rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
@@ -342,6 +344,7 @@ async function cargarExtras(){
     tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
     tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
     tareas.push(rpc("permisos_asistencia",{p_codigo:S.codigo}).then(r=>S.permAsis=r||[]).catch(()=>S.permAsis=[]));
+    tareas.push(rpc("dnis",{p_codigo:S.codigo}).then(r=>S.dnis=r).catch(()=>S.dnis={miembros:{},tesoreros:{}}));
     tareas.push(rpc("permisos_kiosco",{p_codigo:S.codigo}).then(r=>S.permKiosco=r||[]).catch(()=>S.permKiosco=[]));
     tareas.push(rpc("permisos_gasto",{p_codigo:S.codigo}).then(r=>S.permGasto=r||[]).catch(()=>S.permGasto=[]));
     tareas.push(rpc("guia_mails_estado",{p_codigo:S.codigo}).then(r=>S.mails=!!r).catch(()=>S.mails=false));
@@ -367,8 +370,8 @@ function render(){
   mostrar("vMain");
   const m = $("vMain");
   if(S.data.tipo==="miembro"){
-    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
-    m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : vistaMiembro(); montarMiembro(); return; }
+    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
+    m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : S.mtab==="ficha" ? vistaMiFicha() : vistaMiembro(); montarMiembro(); return; }
   const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
   if(S.gastos || S.kiosco) tabs.push(["caja","Caja","receipt"]);
   if(S.reus) tabs.push(["asistencia","Asistencia","check"]);
@@ -467,8 +470,27 @@ function vistaMiembro(){
     <div class="l"><div class="muted tiny">Tu tesorero</div><div class="t">${esc(d.tesorero.nombre)}</div></div>
     <a class="btn wa sm" target="_blank" rel="noopener" href="${waLink(d.tesorero.celular, `Hola ${primer(d.tesorero.nombre)}, soy ${m.nombre}. `)}">${I("msg","sm")} Escribirle</a></div></div>`:""}`;
 }
+async function guardarQR(texto, nombre){
+  try{
+    const tmp = document.createElement("div"); tmp.innerHTML = qrSVG(texto);
+    const svg = tmp.querySelector("svg"); if(!svg) throw new Error("No se pudo generar el QR");
+    svg.setAttribute("width","720"); svg.setAttribute("height","720");
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], {type:"image/svg+xml"}));
+    const img = new Image(); await new Promise((ok, mal)=>{ img.onload = ok; img.onerror = mal; img.src = url; });
+    const W = 900, H = 1080, c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0,0,W,H); x.drawImage(img, 90, 90, 720, 720); URL.revokeObjectURL(url);
+    x.fillStyle = "#1C2233"; x.textAlign = "center"; x.font = "bold 52px Nunito, Arial, sans-serif"; x.fillText(nombre, W/2, 900);
+    x.fillStyle = "#646C80"; x.font = "34px Nunito, Arial, sans-serif"; x.fillText(`QR de asistencia · ${S.data?.parroquia||""}`, W/2, 960);
+    const blob = await new Promise(r=>c.toBlob(r, "image/png"));
+    const archivo = new File([blob], `QR ${nombre}.png`, {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[archivo]})){ try{ await navigator.share({files:[archivo], title:"Mi QR de asistencia"}); return; }catch(e){ if(e.name==="AbortError") return; } }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = archivo.name; document.body.appendChild(a); a.click(); a.remove();
+    toast("QR guardado en Descargas");
+  }catch(e){ toast("No se pudo guardar. Sacale una captura de pantalla al QR."); }
+}
 function montarMiembro(){
   $("vMain").onclick = null; $("vMain").onchange = null;
+  const gq = $("vMain").querySelector("[data-guardar-qr]"); if(gq) gq.onclick = ()=> ocupado(gq, ()=>guardarQR(S.asis.qr, S.data.cuenta.miembro.nombre));
   $("vMain").querySelector("[data-salir]").onclick = salir;
   const pg = $("vMain").querySelector("[data-pagar]"); if(pg) pg.onclick = hojaPago;
 }
@@ -611,13 +633,14 @@ function tabGestion(){
     ${sinTes?`<div class="estado bad">${I("alert")}<span>${sinTes} ${sinTes===1?"dirigente sin tesorero":"dirigentes sin tesorero"} asignado</span></div>`:""}
     <div class="list">${p.miembros.map(m=>`
       <div class="item" style="flex-wrap:wrap;${m.activo?"":"opacity:.6"}"><div class="avatar sm">${esc(ini(m.nombre))}</div>
-        <div class="l"><div class="t">${esc(m.nombre)}${m.activo?"":` <span class="pill off">De baja</span>`}${m.email?"":` <span class="pill warn">Sin mail</span>`}</div>
+        <div class="l"><div class="t">${esc(m.nombre)}${m.activo?"":` <span class="pill off">De baja</span>`}${m.email?"":` <span class="pill warn">Sin mail</span>`}${dniDe("miembro",m.id)?"":` <span class="pill bad">Sin DNI</span>`}</div>
         <div class="muted small">${fmt(m.aporte_mensual)}/mes</div></div>
         ${m.activo?`<label style="flex:1 1 100%">Tesorero a cargo<select data-cambiar-tes="${m.id}"><option value="">Sin tesorero</option>${act.map(t=>`<option value="${t.id}" ${m.tesorero_id===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</select></label>`:""}
         <div class="actions" style="width:100%">
           <button class="btn ghost sm" data-edit-mem="${m.id}">${I("edit","sm")} Editar</button>
           ${m.activo?`<button class="btn ghost sm" data-link-mem="${m.id}">${I("msg","sm")} Enviar acceso</button>`:""}
           ${m.activo?`<button class="btn ghost sm" data-ver-qr="${m.id}">${I("check","sm")} Ver QR</button>`:""}
+          <button class="btn ghost sm" data-ficha="${m.id}">${I("users","sm")} Ficha</button>
           <button class="btn ghost sm" data-baja-mem="${m.id}" data-activo="${m.activo}">${I("power","sm")} ${m.activo?"Dar de baja":"Reactivar"}</button>
         </div></div>`).join("")}</div>
   </div>`;
@@ -838,7 +861,96 @@ function historialAsisHTML(a, propio){
 }
 async function hojaHistorial(mid){
   try{ const a = await rpc("asistencia_de",{p_codigo:S.codigo,p_miembro:mid});
-    abrirHoja(`<h2>Asistencia de ${esc(a.nombre)}</h2>${historialAsisHTML(a, false)}<button class="btn soft" data-cerrar>Cerrar</button>`);
+    abrirHoja(`<h2>Asistencia de ${esc(a.nombre)}</h2>${historialAsisHTML(a, false)}<div class="actions"><button class="btn soft" data-vficha>${I("users")} Ver ficha</button><button class="btn soft" data-cerrar>Cerrar</button></div>`,
+      (sh, cerrar)=>{ sh.querySelector("[data-vficha]").onclick = ()=>{ cerrar(); hojaFicha(mid); }; });
+  }catch(e){ toast(e.message); }
+}
+
+// ===== Ficha del dirigente =====
+const fechaAR = iso => iso ? iso.split("-").reverse().join("/") : "";
+function fichaHTML(f){
+  const dato = (k, v, vacio="—") => `<div class="stat"><span class="muted tiny">${k}</span><b>${v===null||v===undefined||v===""?`<span class="muted">${vacio}</span>`:v}</b></div>`;
+  const lista = (titulo, xs) => `<h3>${titulo} <span class="muted small">(${xs.length})</span></h3>${xs.length?`<div class="list">${xs.map(c=>`<div class="item" style="padding:8px 0"><div class="ic ok" style="width:32px;height:32px">${I("check","sm")}</div><div class="l">${esc(c)}</div></div>`).join("")}</div>`:`<div class="muted small">Ninguno cargado.</div>`}`;
+  return `
+    <div class="fgrid">
+      ${dato("N° de Alfa", f.numero_alfa?esc(f.numero_alfa):"")}
+      ${dato("Fecha de jornada", fechaAR(f.fecha_jornada))}
+      ${dato("Edad", f.edad!==null?`${f.edad} años`:"", "Sin fecha de nac.")}
+      ${dato("Meses de rodaje", f.meses_rodaje!==null?`${f.meses_rodaje}`:"", "Sin fecha")}
+      ${dato("Equipos", f.equipos)}
+      ${dato("Mensajes dados", f.mensajes)}
+    </div>
+    <div class="row small"><span class="muted">DNI</span><b class="num">${f.dni?esc(f.dni):"—"}</b></div>
+    ${f.fecha_nacimiento?`<div class="row small"><span class="muted">Fecha de nacimiento</span><b class="num">${fechaAR(f.fecha_nacimiento)}</b></div>`:""}
+    ${f.meses_rodaje!==null?`<div class="muted tiny">El rodaje se cuenta desde ${f.rodaje_desde==="inicio"?`el ${fechaAR(f.inicio_rodaje)} (inicio del rodaje)`:`la jornada (${fechaAR(f.fecha_jornada)})`}. Edad y rodaje se actualizan solos.</div>`:""}
+    ${lista("Cursos intensivos", f.cursos_intensivos||[])}
+    ${lista("Cursos extensivos", f.cursos_extensivos||[])}`;
+}
+function vistaMiFicha(){
+  const d = S.data, f = S.ficha, m = d.cuenta.miembro;
+  return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
+  <div class="card"><h2>${I("users")} Mi ficha</h2>${f?fichaHTML(f):`<div class="muted small">No se pudo cargar tu ficha.</div>`}
+  <div class="muted small">Si algún dato está mal, avisale a tu guía.</div></div>`;
+}
+async function hojaFicha(mid){
+  try{
+    const f = await rpc("ficha_de",{p_codigo:S.codigo,p_miembro:mid});
+    abrirHoja(`<h2>Ficha de ${esc(f.nombre)}</h2>${fichaHTML(f)}
+      <div class="actions">${S.data.tipo==="guia"?`<button class="btn" data-editar-ficha>${I("edit")} Editar ficha</button>`:""}<button class="btn soft" data-cerrar>Cerrar</button></div>`,
+      (sh, cerrar)=>{ const b = sh.querySelector("[data-editar-ficha]"); if(b) b.onclick = ()=>{ cerrar(); hojaEditarFicha(f); }; });
+  }catch(e){ toast(e.message); }
+}
+function hojaEditarFicha(f){
+  const ci = [...(f.cursos_intensivos||[])], ce = [...(f.cursos_extensivos||[])];
+  const listaEd = (id, xs) => xs.map((c,i)=>`<div class="item" style="padding:6px 0"><div class="l">${esc(c)}</div><button class="btn ghost sm" data-quitar="${id}:${i}" aria-label="Quitar">${I("x","sm")}</button></div>`).join("") || `<div class="muted small">Ninguno.</div>`;
+  const contador = (id, label, v) => `<label>${label}<div style="display:flex;gap:8px"><button class="btn soft sm" type="button" data-menos="${id}">−</button>
+    <input id="${id}" type="number" inputmode="numeric" min="0" value="${v||0}" style="text-align:center"><button class="btn soft sm" type="button" data-mas="${id}">+</button></div></label>`;
+  abrirHoja(`<h2>Ficha de ${esc(f.nombre)}</h2>
+    <div class="grid2"><label>N° de Alfa<input id="fiAlfa" inputmode="numeric" value="${esc(f.numero_alfa||"")}" placeholder="Ej.: 42"></label>
+    <label>DNI<input id="fiDni" inputmode="numeric" value="${esc(f.dni||"")}" placeholder="Sin puntos"></label></div>
+    <div class="grid2"><label>Fecha de la jornada<input id="fiJor" type="date" value="${f.fecha_jornada||""}"></label>
+    <label>Fecha de nacimiento<input id="fiNac" type="date" value="${f.fecha_nacimiento||""}"></label></div>
+    <label>Inicio del rodaje (opcional)<input id="fiRod" type="date" value="${f.inicio_rodaje||""}"></label>
+    <div class="muted small">Si dejás el inicio del rodaje vacío, los meses se cuentan desde la jornada.</div>
+    <div class="grid2">${contador("fiEq","Equipos",f.equipos)}${contador("fiMsj","Mensajes dados",f.mensajes)}</div>
+    <h3>Cursos intensivos</h3><div class="list" id="fiCI">${listaEd("ci",ci)}</div>
+    <div style="display:flex;gap:8px"><input id="fiCInuevo" placeholder="Nombre del curso intensivo"><button class="btn soft sm" type="button" data-agregar="ci">${I("plus","sm")}</button></div>
+    <h3>Cursos extensivos</h3><div class="list" id="fiCE">${listaEd("ce",ce)}</div>
+    <div style="display:flex;gap:8px"><input id="fiCEnuevo" placeholder="Nombre del curso extensivo"><button class="btn soft sm" type="button" data-agregar="ce">${I("plus","sm")}</button></div>
+    <div class="err" id="fiErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fiOk">${I("check")} Guardar ficha</button></div>`,
+  (s, cerrar)=>{
+    const pintar = ()=>{ s.querySelector("#fiCI").innerHTML = listaEd("ci",ci); s.querySelector("#fiCE").innerHTML = listaEd("ce",ce); };
+    const agregar = id => { const inp = s.querySelector(id==="ci"?"#fiCInuevo":"#fiCEnuevo"); const v = inp.value.trim(); if(!v) return; (id==="ci"?ci:ce).push(v); inp.value=""; pintar(); inp.focus(); };
+    s.addEventListener("click", ev=>{
+      const b = ev.target.closest("button"); if(!b) return;
+      if(b.dataset.agregar) agregar(b.dataset.agregar);
+      if(b.dataset.quitar){ const [id,i] = b.dataset.quitar.split(":"); (id==="ci"?ci:ce).splice(Number(i),1); pintar(); }
+      if(b.dataset.mas||b.dataset.menos){ const inp = s.querySelector("#"+(b.dataset.mas||b.dataset.menos)); inp.value = Math.max(0,(Number(inp.value)||0)+(b.dataset.mas?1:-1)); }
+    });
+    ["#fiCInuevo","#fiCEnuevo"].forEach(sel=> s.querySelector(sel).onkeydown = ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); agregar(sel==="#fiCInuevo"?"ci":"ce"); } });
+    const ok = s.querySelector("#fiOk"); ok.onclick = () => ocupado(ok, async()=>{
+      try{
+        const pend = [["#fiCInuevo",ci],["#fiCEnuevo",ce]]; pend.forEach(([sel,arr])=>{ const v=s.querySelector(sel).value.trim(); if(v) arr.push(v); });
+        await rpc("guardar_ficha",{p_codigo:S.codigo,p_miembro:f.id,p_datos:{numero_alfa:s.querySelector("#fiAlfa").value,fecha_jornada:s.querySelector("#fiJor").value,
+          fecha_nacimiento:s.querySelector("#fiNac").value,inicio_rodaje:s.querySelector("#fiRod").value,equipos:s.querySelector("#fiEq").value,mensajes:s.querySelector("#fiMsj").value,
+          cursos_intensivos:ci,cursos_extensivos:ce}});
+        if((s.querySelector("#fiDni").value||"").replace(/\D/g,"") !== (f.dni||"")) await rpc("set_dni",{p_codigo:S.codigo,p_tipo:"miembro",p_id:f.id,p_dni:s.querySelector("#fiDni").value});
+        cerrar(); await recargar(); toast("Ficha guardada"); hojaFicha(f.id);
+      }catch(e){ const er=s.querySelector("#fiErr"); er.textContent=e.message; er.hidden=false; }
+    });
+  });
+}
+async function exportarFichas(){
+  try{
+    await cargarXLSX();
+    const d = await rpc("export_fichas",{p_codigo:S.codigo});
+    const cab = ["Dirigente","DNI","Fecha de nacimiento","Edad","N° de Alfa","Fecha de jornada","Inicio del rodaje","Meses de rodaje","Equipos","Mensajes dados","Cursos intensivos","Cant. intensivos","Cursos extensivos","Cant. extensivos","Tesorero","Celular"];
+    const filas = [[`Fichas de dirigentes · ${d.parroquia}`],[`Generado el ${d.generado}`],[], cab,
+      ...d.fichas.map(f=>[f.nombre, f.dni||"", fechaAR(f.fecha_nacimiento), f.edad??"", f.numero_alfa||"", fechaAR(f.fecha_jornada), fechaAR(f.inicio_rodaje), f.meses_rodaje??"",
+        f.equipos, f.mensajes, (f.cursos_intensivos||[]).join(", "), (f.cursos_intensivos||[]).length, (f.cursos_extensivos||[]).join(", "), (f.cursos_extensivos||[]).length, f.tesorero||"", f.celular||""])];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaXLSX(filas, [24,12,14,6,10,14,14,10,9,10,40,10,40,10,18,16]), "Fichas");
+    XLSX.writeFile(wb, `Fichas ${fechaArchivo()}.xlsx`); toast("Excel descargado");
   }catch(e){ toast(e.message); }
 }
 
@@ -851,7 +963,8 @@ function vistaMiAsistencia(){
   <div class="card" style="align-items:center;text-align:center">
     <h2 style="align-self:flex-start">${I("check")} Mi QR de asistencia</h2>
     <div class="qrbox">${qrSVG(a.qr)}</div>
-    <div class="muted small">Mostralo cuando llegues a la escuela de dirigentes o a un evento. Subí el brillo de la pantalla si cuesta leerlo.</div>
+    <div class="muted small">Es tuyo y no cambia nunca. Guardalo en la galería para mostrarlo aunque no tengas datos, o imprimilo.</div>
+    <button class="btn block" data-guardar-qr>${I("upload")} Guardar mi QR como imagen</button>
   </div>
   <div class="card"><h2>${I("clock")} Mi asistencia</h2>${historialAsisHTML({...a, racha:0}, true)}</div>`;
 }
@@ -868,6 +981,7 @@ function tabAsistencia(){
     <span class="chip">${R.reuniones.length===1?"reunión o evento registrado":"reuniones y eventos registrados"}</span>
     ${R.puede_tomar!==false?`<button class="btn block" data-nueva-reu>${I("plus")} Nueva reunión o evento</button>`:""}
     <button class="btn block" data-excel-asis style="background:rgba(255,255,255,.18);color:#fff">${I("file")} Descargar Excel de asistencia</button>
+    ${["guia","autoridad"].includes(S.data.tipo)?`<button class="btn block" data-excel-fichas style="background:rgba(255,255,255,.18);color:#fff">${I("users")} Descargar fichas de dirigentes</button>`:""}
   </div>
   ${alertasHTML()}
   <div class="card"><h2>${I("clock")} Reuniones y eventos</h2><div class="list">${R.reuniones.length ? R.reuniones.map(r=>`
@@ -1001,6 +1115,7 @@ function montarAsistencia(){
   const m = $("vMain");
   const n = m.querySelector("[data-nueva-reu]"); if(n) n.onclick = hojaReunion;
   const xa = m.querySelector("[data-excel-asis]"); if(xa) xa.onclick = e=>{ e.stopPropagation(); ocupado(xa, exportarAsistencia); };
+  const xf = m.querySelector("[data-excel-fichas]"); if(xf) xf.onclick = e=>{ e.stopPropagation(); ocupado(xf, exportarFichas); };
   m.querySelectorAll("[data-hist]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); hojaHistorial(Number(b.dataset.hist)); });
   m.querySelectorAll("[data-escanear]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirEscaner(Number(b.dataset.escanear)); });
   m.querySelectorAll("[data-lista-reu]").forEach(b=> b.onclick = e=>{ e.stopPropagation(); abrirListaReunion(Number(b.dataset.listaReu)); });
@@ -1242,11 +1357,12 @@ function hojaRecibo(r){
 }
 function hojaLink(nombre, celular, codigo, esTesorero, esAutoridad){
   const link = linkPersonal(codigo);
+  const base = location.origin + location.pathname;
   const msg = esAutoridad
-    ? `Hola ${primer(nombre)}, este es tu acceso para ver la asistencia de los dirigentes. No lo compartas:\n${link}`
+    ? `Hola ${primer(nombre)}, este es tu acceso para ver la asistencia de los dirigentes. Entrá con tu DNI en ${base} o directo con este link (no lo compartas):\n${link}`
     : esTesorero
-    ? `Hola ${primer(nombre)}, este es tu acceso como tesorero a la app de aportes. No lo compartas:\n${link}`
-    : `Hola ${primer(nombre)}, este es tu link personal para ver tu cuenta de aportes y subir comprobantes. No lo compartas:\n${link}`;
+    ? `Hola ${primer(nombre)}, este es tu acceso como tesorero a la app de aportes. Entrá con tu DNI en ${base} o directo con este link (no lo compartas):\n${link}`
+    : `Hola ${primer(nombre)}, ya podés ver tu cuenta de aportes y tu asistencia. Entrá con tu DNI en ${base} o directo con este link (no lo compartas):\n${link}`;
   abrirHoja(`<h2>Acceso de ${esc(nombre)}</h2>
     <div class="receipt" style="word-break:break-all">${esc(link)}</div>
     <div class="muted small">Código: <b>${esc(codigo)}</b>. Si alguien más lo conoce, generá uno nuevo: el anterior deja de funcionar.</div>
@@ -1272,27 +1388,34 @@ function hojaLink(nombre, celular, codigo, esTesorero, esAutoridad){
 }
 
 // ===== Formularios de gestión =====
+const dniDe = (tipo, id) => (S.dnis?.[tipo==="miembro"?"miembros":"tesoreros"]||{})[String(id)] || "";
+async function guardarDni(tipo, id, valor, antes){ if((valor||"").replace(/\D/g,"") === (antes||"")) return; await rpc("set_dni",{p_codigo:S.codigo,p_tipo:tipo,p_id:id,p_dni:valor}); }
+const campoDni = v => `<label>DNI (para entrar a la app)<input id="fDni" inputmode="numeric" placeholder="Sin puntos" value="${esc(v||"")}"></label>`;
 function hojaAutoridad(t){
   abrirHoja(`<h2>${t?"Editar autoridad":"Nueva autoridad"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
+    ${campoDni(t?dniDe("tesorero",t.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" value="${esc(t?.celular||"")}"></label>
     <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
     try{ const r = await rpc("guardar_autoridad",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      await guardarDni("tesorero", r.id, s.querySelector("#fDni").value, t?dniDe("tesorero",t.id):"");
       cerrar(); await recargar(); toast("Autoridad guardada"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true, true);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
 }
 function hojaTesorero(t){
   abrirHoja(`<h2>${t?"Editar tesorero":"Nuevo tesorero"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
+    ${campoDni(t?dniDe("tesorero",t.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(t?.celular||"")}"></label>
     <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
     try{ const r = await rpc("guardar_tesorero",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      await guardarDni("tesorero", r.id, s.querySelector("#fDni").value, t?dniDe("tesorero",t.id):"");
       cerrar(); await recargar(); toast("Tesorero guardado"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
 }
@@ -1300,6 +1423,7 @@ function hojaMiembro(m){
   const act = S.panel.tesoreros.filter(t=>t.activo && t.rol!=="autoridad");
   abrirHoja(`<h2>${m?"Editar dirigente":"Nuevo dirigente"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(m?.nombre||"")}"></label>
+    ${campoDni(m?dniDe("miembro",m.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(m?.celular||"")}"></label>
     <label>Mail (para recibos)<input id="fMail" type="email" value="${esc(m?.email||"")}"></label></div>
     <div class="grid2"><label>Aporte mensual ($)<input id="fAp" type="number" inputmode="numeric" min="0" value="${m?Math.round(m.aporte_mensual):""}"></label>
@@ -1309,6 +1433,7 @@ function hojaMiembro(m){
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
     try{ const tes = s.querySelector("#fTes").value;
       const r = await rpc("guardar_miembro",{p_codigo:S.codigo,p_id:m?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value,p_tesorero:tes?Number(tes):null,p_aporte:Number(s.querySelector("#fAp").value)});
+      await guardarDni("miembro", r.id, s.querySelector("#fDni").value, m?dniDe("miembro",m.id):"");
       cerrar(); await recargar(); toast("Dirigente guardado"); if(!m) hojaLink(r.nombre, r.celular, r.codigo, false);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
 }
@@ -1389,9 +1514,11 @@ function montarTesorero(){
       return ocupado(b, async()=>{ try{ const r=await rpc("set_tesorero_activo",{p_codigo:S.codigo,p_id:t.id,p_activo:!act}); await recargar(); toast(act?`Dado de baja. ${r.liberados} dirigentes quedaron sin tesorero.`:"Reactivado"); }catch(er){ toast(er.message) } }); }
     if(ds.asisPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.asisPerm);
       return ocupado(b, async()=>{ try{ await rpc("set_puede_asistencia",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede tomar asistencia`); }catch(er){ toast(er.message) } }); }
+    if(ds.ficha) return hojaFicha(Number(ds.ficha));
     if(ds.verQr){ const x=P.miembros.find(y=>y.id==ds.verQr);
       return ocupado(b, async()=>{ try{ const q = await rpc("qr_de",{p_codigo:S.codigo,p_miembro:x.id});
-        abrirHoja(`<h2>QR de ${esc(x.nombre)}</h2><div class="qrbox">${qrSVG(q)}</div><div class="muted small">Sirve para tomarle asistencia si no tiene el celular: sacale una captura o imprimilo.</div><button class="btn soft" data-cerrar>Cerrar</button>`);
+        abrirHoja(`<h2>QR de ${esc(x.nombre)}</h2><div class="qrbox">${qrSVG(q)}</div><div class="muted small">Es fijo: no cambia nunca. Sirve para tomarle asistencia si no tiene el celular.</div><button class="btn" data-dl-qr>${I("upload")} Guardar como imagen</button><button class="btn soft" data-cerrar>Cerrar</button>`,
+          (sh)=>{ const d = sh.querySelector("[data-dl-qr]"); d.onclick = ()=> ocupado(d, ()=>guardarQR(q, x.nombre)); });
       }catch(er){ toast(er.message) } }); }
     if(ds.kioscoPerm){ const tiene = ds.tiene==="true", t=P.tesoreros.find(x=>x.id==ds.kioscoPerm);
       return ocupado(b, async()=>{ try{ await rpc("set_puede_kiosco",{p_codigo:S.codigo,p_id:t.id,p_valor:!tiene}); await recargar(); toast(tiene?"Permiso quitado":`${t.nombre} ya puede manejar el kiosco`); }catch(er){ toast(er.message) } }); }
@@ -1476,7 +1603,8 @@ async function abrirDetalle(b){
       <div class="list">${pagosHTML(c.pagos, true)}</div>
       <h3>Asistencia</h3>
       <div data-asis-det style="display:flex;flex-direction:column;gap:10px"><div class="muted small">Cargando…</div></div>
-      <div class="actions"><button class="btn soft sm" data-link-det>${I("msg","sm")} Enviarle su link</button></div>`;
+      <div class="actions"><button class="btn soft sm" data-link-det>${I("msg","sm")} Enviarle su link</button><button class="btn soft sm" data-ficha-det>${I("users","sm")} Ver ficha</button></div>`;
+    det.querySelector("[data-ficha-det]").onclick = ev => { ev.stopPropagation(); hojaFicha(Number(b.dataset.mem)); };
     rpc("asistencia_de",{p_codigo:S.codigo,p_miembro:Number(b.dataset.mem)}).then(a=>{ const box = det.querySelector("[data-asis-det]"); if(box) box.innerHTML = historialAsisHTML(a, false); })
       .catch(()=>{ const box = det.querySelector("[data-asis-det]"); if(box) box.innerHTML = `<div class="muted small">No se pudo cargar la asistencia.</div>`; });
     det.querySelector("[data-link-det]").onclick = (ev) => { ev.stopPropagation();
@@ -1489,7 +1617,13 @@ async function abrirDetalle(b){
 }
 
 // ===== Inicio =====
-$("btnEntrar").onclick = ()=>{ const c=$("inCodigo").value.trim(); if(c){ $("loginErr").hidden=true; entrar(c); } };
+$("btnEntrar").onclick = async ()=>{
+  const c=$("inCodigo").value.trim(); if(!c) return; $("loginErr").hidden=true;
+  if(/^[\d.\s-]+$/.test(c)){
+    try{ const cod = await rpc("codigo_por_dni",{p_dni:c}); entrar(cod); }
+    catch(e){ $("loginErr").textContent = e.message; $("loginErr").hidden = false; }
+  } else entrar(c);
+};
 $("inCodigo").onkeydown = e => { if(e.key==="Enter") $("btnEntrar").click(); };
 function paginaKiosco(){
   $("tabs").hidden = true; for(const v of ["vCargando","vLogin"]) $(v).hidden = true; $("vMain").hidden = false;
