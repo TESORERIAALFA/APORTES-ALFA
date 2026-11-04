@@ -342,13 +342,25 @@ async function entrar(cod){
   }
 }
 async function recargar(){
+  if(S.aut) S.codigo = S.aut.codigo;
   S.data = await rpc("entrar", {p_codigo:S.codigo});
   await cargarExtras();
   render();
 }
 async function cargarExtras(){
   if(S.data.tipo==="miembro"){ [S.asis, S.ficha] = await Promise.all([rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null), rpc("mi_ficha",{p_codigo:S.codigo}).catch(()=>null)]); return; }
-  if(S.data.tipo==="autoridad"){ S.reus = await rpc("reuniones_lista",{p_codigo:S.codigo}).catch(()=>null); S.gastos=null; S.kiosco=null; return; }
+  if(S.data.tipo==="autoridad"){
+    S.aut = {data:S.data, codigo:S.codigo}; S.gastos=null; S.kiosco=null;
+    const yc = S.data.yo_codigo;
+    await Promise.all([
+      rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null),
+      rpc("export_fichas",{p_codigo:S.codigo}).then(r=>S.fichas=r.fichas).catch(()=>S.fichas=null),
+      yc ? Promise.all([rpc("entrar",{p_codigo:yc}), rpc("mi_asistencia",{p_codigo:yc}).catch(()=>null), rpc("mi_ficha",{p_codigo:yc}).catch(()=>null)])
+        .then(([data,asis,ficha])=> S.yo={codigo:yc,data,asis,ficha}).catch(()=>S.yo=null) : (S.yo=null)
+    ]);
+    return;
+  }
+  S.aut = null; S.yo = null;
   const tareas = [rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
     rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.tipo==="guia"){
@@ -367,7 +379,7 @@ function mostrar(id){
   $("tabs").hidden = !(id==="vMain" && S.data);
 }
 function salir(){
-  store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null;
+  store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null; S.aut=null; S.yo=null; S.fichas=null;
   history.replaceState(null,"",location.pathname); $("inCodigo").value=""; $("loginErr").hidden=true; mostrar("vLogin");
 }
 
@@ -379,6 +391,7 @@ function cabecera(nombre, sub, sun){
 
 function render(){
   mostrar("vMain");
+  if(S.aut) return renderAutoridad();
   const m = $("vMain");
   if(S.data.tipo==="miembro"){
     $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
@@ -406,9 +419,37 @@ function render(){
   m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
   montarTesorero(); montarExtras(); montarAsistencia(); montarCaja();
 }
+function renderAutoridad(){
+  const m = $("vMain");
+  const tabs = [["asistencia","Asistencia","check"],["fichas","Fichas","users"]];
+  if(S.yo) tabs.push(["yo_aportes","Mis aportes","heart"],["yo_asis","Mi asistencia","clock"],["yo_ficha","Mi ficha","award"]);
+  if(!tabs.find(t=>t[0]===S.tab)) S.tab = "asistencia";
+  $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""} style="font-size:${tabs.length>3?".7rem":".78rem"}">${I(ic)}<span>${t}</span></button>`).join("");
+  if(S.tab.startsWith("yo_")){
+    S.data = S.yo.data; S.codigo = S.yo.codigo; S.asis = S.yo.asis; S.ficha = S.yo.ficha;
+    m.innerHTML = S.tab==="yo_asis" ? vistaMiAsistencia() : S.tab==="yo_ficha" ? vistaMiFicha() : vistaMiembro();
+    montarMiembro(); return;
+  }
+  S.data = S.aut.data; S.codigo = S.aut.codigo;
+  const sub = S.yo ? "Autoridad · también dirigente" : "Autoridad · asistencia y fichas";
+  m.innerHTML = cabecera(S.data.tesorero.nombre, sub) + (S.tab==="fichas" ? tabFichas() : tabAsistencia());
+  montarTesorero(); montarAsistencia();
+  const bus = m.querySelector("#fiBuscar"); if(bus) bus.oninput = () => { const q = bus.value.trim().toLowerCase();
+    m.querySelectorAll("[data-fila-ficha]").forEach(x=> x.hidden = q && !x.dataset.filaFicha.includes(q)); };
+}
+function tabFichas(){
+  const fs = S.fichas;
+  if(!fs) return `<div class="card">No se pudieron cargar las fichas. Probá de nuevo más tarde.</div>`;
+  return `<div class="card"><h2>${I("users")} Fichas de los dirigentes</h2>
+    <input id="fiBuscar" type="search" placeholder="Buscar por nombre" autocomplete="off">
+    <div class="list">${fs.map(f=>`<div class="item" data-fila-ficha="${esc(f.nombre.toLowerCase())}"><div class="avatar sm">${esc(ini(f.nombre))}</div>
+      <div class="l"><div class="t">${esc(f.nombre)}</div><div class="muted small">${[f.numero_alfa?`Alfa ${esc(f.numero_alfa)}`:"", f.edad!=null?`${f.edad} años`:"", `${f.equipos} ${f.equipos===1?"equipo":"equipos"}`, `${f.mensajes} ${f.mensajes===1?"mensaje":"mensajes"}`].filter(Boolean).join(" · ")}</div></div>
+      <button class="btn ghost sm" data-ficha="${f.id}">Ver ›</button></div>`).join("") || `<div class="muted small">Todavía no hay dirigentes.</div>`}</div>
+    <button class="btn soft block" data-excel-fichas>${I("file")} Descargar Excel de fichas</button></div>`;
+}
 $("tabsIn").onclick = e => {
   const mb=e.target.closest("[data-mtab]"); if(mb){ S.mtab=mb.dataset.mtab; store("aportes_mtab",S.mtab); render(); scrollTo({top:0}); return; }
-  const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+S.data.tipo, S.tab); render(); scrollTo({top:0}); };
+  const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+(S.aut?"autoridad":S.data.tipo), S.tab); render(); scrollTo({top:0}); };
 
 // ===== Aporte anual =====
 function estadoAporte(a){
@@ -710,10 +751,10 @@ function tabGestion(){
   sec.autoridades = `
   <div class="card">
     <div class="row"><h2>${I("award")} Autoridades</h2><button class="btn sm" data-nueva-aut>${I("plus","sm")} Nueva</button></div>
-    <div class="muted small">Ven solo la asistencia de los dirigentes (reuniones, historial, alertas y Excel). No ven nada de plata ni pueden tomar asistencia.</div>
+    <div class="muted small">Ven la asistencia y las fichas de los dirigentes. No ven nada de plata ni pueden tomar asistencia. Si además es dirigente, vinculalo y con el mismo DNI ve también sus aportes, su asistencia y su ficha.</div>
     <div class="list">${auts.length ? auts.map(t=>`
       <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm">${esc(ini(t.nombre))}</div>
-        <div class="l"><div class="t">${esc(t.nombre)}${t.activo?"":` <span class="pill off">De baja</span>`}</div><div class="muted small">${esc(t.celular||"Sin celular")}</div></div>
+        <div class="l"><div class="t">${esc(t.nombre)}${t.activo?"":` <span class="pill off">De baja</span>`}</div><div class="muted small">${esc(t.celular||"Sin celular")}${t.miembro_id?` · también dirigente (${esc(p.miembros.find(x=>x.id===t.miembro_id)?.nombre||"")})`:""}</div></div>
         <div class="actions" style="width:100%">${t.activo?`<button class="btn soft sm" data-link-aut="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
           <button class="btn ghost sm" data-edit-aut="${t.id}">${I("edit","sm")} Editar</button>
           <button class="btn ghost sm" data-baja-tes="${t.id}" data-activo="${t.activo}">${I("power","sm")} ${t.activo?"Quitar acceso":"Devolver acceso"}</button></div></div>`).join("")
@@ -1444,10 +1485,14 @@ function hojaAutoridad(t){
     ${campoDni(t?dniDe("tesorero",t.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" value="${esc(t?.celular||"")}"></label>
     <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
+    <label>¿También es dirigente?<select id="fYo"><option value="">No</option>${S.panel.miembros.filter(x=>x.activo).map(x=>`<option value="${x.id}" ${t?.miembro_id===x.id?"selected":""}>Sí: ${esc(x.nombre)}</option>`).join("")}</select></label>
+    <div class="muted tiny">Si es dirigente, elegí su nombre: con su DNI va a ver también sus aportes, su asistencia y su ficha, y le siguen tomando asistencia y cobrando como a cualquier dirigente.</div>
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
-    try{ const r = await rpc("guardar_autoridad",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+    try{ const yo = Number(s.querySelector("#fYo").value)||null;
+      const r = await rpc("guardar_autoridad",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      if(yo !== (t?.miembro_id??null)) await rpc("vincular_autoridad",{p_codigo:S.codigo,p_id:r.id,p_miembro:yo});
       await guardarDni("tesorero", r.id, s.querySelector("#fDni").value, t?dniDe("tesorero",t.id):"");
       cerrar(); await recargar(); toast("Autoridad guardada"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true, true);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
