@@ -333,7 +333,7 @@ async function entrar(cod){
     S.codigo = cod.trim().toUpperCase();
     store("aportes_codigo", S.codigo);
     await cargarExtras();
-    S.tab = read("aportes_tab_"+S.data.tipo) || "inicio";
+    S.tab = read("aportes_tab_"+S.data.tipo) || "inicio"; if(S.tab==="yo") S.tab = "inicio";
     S.mtab = read("aportes_mtab") || "aportes";
     render();
   }catch(e){
@@ -342,7 +342,7 @@ async function entrar(cod){
   }
 }
 async function recargar(){
-  if(S.aut) S.codigo = S.aut.codigo;
+  if(S.staff) S.codigo = S.staff.codigo;
   S.data = await rpc("entrar", {p_codigo:S.codigo});
   await cargarExtras();
   render();
@@ -350,7 +350,7 @@ async function recargar(){
 async function cargarExtras(){
   if(S.data.tipo==="miembro"){ [S.asis, S.ficha] = await Promise.all([rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null), rpc("mi_ficha",{p_codigo:S.codigo}).catch(()=>null)]); return; }
   if(S.data.tipo==="autoridad"){
-    S.aut = {data:S.data, codigo:S.codigo}; S.gastos=null; S.kiosco=null;
+    S.aut = S.staff = {data:S.data, codigo:S.codigo}; S.gastos=null; S.kiosco=null;
     const yc = S.data.yo_codigo;
     await Promise.all([
       rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null),
@@ -360,9 +360,12 @@ async function cargarExtras(){
     ]);
     return;
   }
-  S.aut = null; S.yo = null;
+  S.aut = null; S.staff = {data:S.data, codigo:S.codigo}; S.yo = null;
   const tareas = [rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
     rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
+  if(S.data.yo_codigo){ const yc = S.data.yo_codigo;
+    tareas.push(Promise.all([rpc("entrar",{p_codigo:yc}), rpc("mi_asistencia",{p_codigo:yc}).catch(()=>null), rpc("mi_ficha",{p_codigo:yc}).catch(()=>null)])
+      .then(([data,asis,ficha])=> S.yo={codigo:yc,data,asis,ficha}).catch(()=>S.yo=null)); }
   if(S.data.tipo==="guia"){
     tareas.push(rpc("guia_panel",{p_codigo:S.codigo}).then(r=>S.panel=r).catch(()=>S.panel=null));
     tareas.push(rpc("guia_caja",{p_codigo:S.codigo}).then(r=>S.caja=r).catch(()=>S.caja=null));
@@ -379,13 +382,14 @@ function mostrar(id){
   $("tabs").hidden = !(id==="vMain" && S.data);
 }
 function salir(){
-  store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null; S.aut=null; S.yo=null; S.fichas=null;
+  store("aportes_codigo", null); S.codigo=null; S.data=null; S.panel=null; S.aut=null; S.staff=null; S.yo=null; S.fichas=null;
   history.replaceState(null,"",location.pathname); $("inCodigo").value=""; $("loginErr").hidden=true; mostrar("vLogin");
 }
 
 function cabecera(nombre, sub, sun){
   return `<div class="head"><div class="avatar ${sun?"sun":""}">${esc(ini(nombre))}</div>
     <div class="who"><b>Hola, ${esc(primer(nombre))}</b><span>${esc(sub)}</span></div>
+    ${S.staff && !S.aut && S.yo && S.tab!=="yo" ? `<button class="btn soft sm" data-mi-cuenta style="margin-right:6px">${I("heart","sm")} Mi cuenta</button>` : ""}
     <button class="iconbtn" data-salir aria-label="Salir">${I("logout")}</button></div>`;
 }
 
@@ -393,6 +397,7 @@ function render(){
   mostrar("vMain");
   if(S.aut) return renderAutoridad();
   const m = $("vMain");
+  if(S.staff){ S.data = S.staff.data; S.codigo = S.staff.codigo; }
   if(S.data.tipo==="miembro"){
     $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
     m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : S.mtab==="ficha" ? vistaMiFicha() : vistaMiembro(); montarMiembro(); return; }
@@ -401,10 +406,12 @@ function render(){
   if(S.reus) tabs.push(["asistencia","Asistencia","check"]);
   if(S.data.tipo==="autoridad"){ tabs.length = 0; tabs.push(["asistencia","Asistencia","check"]); }
   if(S.data.tipo==="guia") tabs.push(["gestion","Gestión","sliders"],["reportes","Reportes","chart"]);
-  if(!tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
+  if(S.tab==="yo" && !S.yo) S.tab = "inicio";
+  if(S.tab!=="yo" && !tabs.find(t=>t[0]===S.tab)) S.tab="inicio";
   if(S.tab==="gastos") S.tab = "caja";
   const pend = S.data.pendientes.length, pendK = S.kiosco?.pendientes?.length||0;
   $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""}>${I(ic)}<span>${t}</span>${id==="inicio"&&pend?`<span class="badge">${pend}</span>`:""}${id==="caja"&&pendK?`<span class="badge">${pendK}</span>`:""}</button>`).join("");
+  if(S.tab==="yo") return renderYo();
   const t = S.data.tesorero;
   const sub = S.data.tipo==="guia" ? `Guía del área · ${S.data.parroquia}` : S.data.tipo==="autoridad" ? `Autoridad · asistencia de los dirigentes` : `Tesorero · ${S.data.miembros.length} dirigentes a cargo`;
   if(S.data.tipo==="autoridad") S.tab = "asistencia";
@@ -418,6 +425,19 @@ function render(){
   if(S.tab==="asistencia") body = tabAsistencia();
   m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
   montarTesorero(); montarExtras(); montarAsistencia(); montarCaja();
+}
+function renderYo(){
+  const m = $("vMain");
+  S.data = S.yo.data; S.codigo = S.yo.codigo; S.asis = S.yo.asis; S.ficha = S.yo.ficha;
+  const v = ["aportes","asistencia","ficha"].includes(S.mtab) ? S.mtab : "aportes";
+  const html = v==="asistencia" ? vistaMiAsistencia() : v==="ficha" ? vistaMiFicha() : vistaMiembro();
+  const barra = `<div class="filters" style="margin:-4px 0 4px">${[["aportes","Mis aportes"],["asistencia","Mi asistencia"],["ficha","Mi ficha"]].map(([id,t])=>`<button data-ytab="${id}" aria-pressed="${v===id}">${t}</button>`).join("")}</div>
+    <button class="btn soft block sm" data-volver-staff style="margin-bottom:4px">${I("home","sm")} Volver a la tesorería</button>`;
+  m.innerHTML = html;
+  const head = m.querySelector(".head"); if(head) head.insertAdjacentHTML("afterend", barra); else m.insertAdjacentHTML("afterbegin", barra);
+  montarMiembro();
+  m.querySelectorAll("[data-ytab]").forEach(b=> b.onclick = ()=>{ S.mtab = b.dataset.ytab; store("aportes_mtab", S.mtab); render(); scrollTo({top:0}); });
+  m.querySelector("[data-volver-staff]").onclick = ()=>{ S.tab = "inicio"; render(); scrollTo({top:0}); };
 }
 function renderAutoridad(){
   const m = $("vMain");
@@ -449,7 +469,7 @@ function tabFichas(){
 }
 $("tabsIn").onclick = e => {
   const mb=e.target.closest("[data-mtab]"); if(mb){ S.mtab=mb.dataset.mtab; store("aportes_mtab",S.mtab); render(); scrollTo({top:0}); return; }
-  const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+(S.aut?"autoridad":S.data.tipo), S.tab); render(); scrollTo({top:0}); };
+  const b=e.target.closest("[data-tab]"); if(!b) return; S.tab=b.dataset.tab; store("aportes_tab_"+(S.staff?S.staff.data.tipo:S.data.tipo), S.tab); render(); scrollTo({top:0}); };
 
 // ===== Aporte anual =====
 function estadoAporte(a){
@@ -668,7 +688,7 @@ function tabGestion(){
     <div class="list">${tes.map(t=>`
       <div class="item" style="flex-wrap:wrap;${t.activo?"":"opacity:.6"}"><div class="avatar sm ${t.rol==="guia"?"sun":""}">${esc(ini(t.nombre))}</div>
         <div class="l"><div class="t">${esc(t.nombre)} ${t.rol==="guia"?`<span class="pill neutral">Guía${t.es_vos?" (vos)":""}</span>`:""}${t.rol!=="guia"&&(S.permGasto||[]).includes(t.id)?` <span class="pill warn">${I("receipt","sm")}Carga gastos</span>`:""}${t.rol!=="guia"&&(S.permAsis||[]).includes(t.id)?` <span class="pill ok">${I("check","sm")}Toma asistencia</span>`:""}${t.rol!=="guia"&&(S.permKiosco||[]).includes(t.id)?` <span class="pill neutral">${I("cash","sm")}Kiosco</span>`:""}${t.activo?"":` <span class="pill off">De baja</span>`}</div>
-        <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}</div></div>
+        <div class="muted small">${t.miembros} dirigentes · ${t.pendientes} comprobantes pendientes · efectivo ${fmt(t.efectivo)}${t.miembro_id?` · también dirigente`:""}</div></div>
         <div class="actions" style="width:100%">
           ${t.activo?`<button class="btn soft sm" data-asig="${t.id}">${I("users","sm")} Dirigentes a cargo</button>
           <button class="btn soft sm" data-link-tes="${t.id}">${I("msg","sm")} Enviar acceso</button>`:""}
@@ -1479,20 +1499,23 @@ function hojaLink(nombre, celular, codigo, esTesorero, esAutoridad){
 const dniDe = (tipo, id) => (S.dnis?.[tipo==="miembro"?"miembros":"tesoreros"]||{})[String(id)] || "";
 async function guardarDni(tipo, id, valor, antes){ if((valor||"").replace(/\D/g,"") === (antes||"")) return; await rpc("set_dni",{p_codigo:S.codigo,p_tipo:tipo,p_id:id,p_dni:valor}); }
 const campoDni = v => `<label>DNI (para entrar a la app)<input id="fDni" inputmode="numeric" placeholder="Sin puntos" value="${esc(v||"")}"></label>`;
+function selectYo(t){
+  return `<label>¿También es dirigente?<select id="fYo"><option value="">No</option>${S.panel.miembros.filter(x=>x.activo).map(x=>`<option value="${x.id}" ${t?.miembro_id===x.id?"selected":""}>Sí: ${esc(x.nombre)}</option>`).join("")}</select></label>
+    <div class="muted tiny">Si es dirigente, elegí su nombre: con su DNI va a ver también sus aportes, su asistencia y su ficha, y le siguen tomando asistencia y cobrando como a cualquier dirigente.</div>`;
+}
 function hojaAutoridad(t){
   abrirHoja(`<h2>${t?"Editar autoridad":"Nueva autoridad"}</h2>
     <label>Nombre y apellido<input id="fNom" value="${esc(t?.nombre||"")}"></label>
     ${campoDni(t?dniDe("tesorero",t.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" value="${esc(t?.celular||"")}"></label>
     <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
-    <label>¿También es dirigente?<select id="fYo"><option value="">No</option>${S.panel.miembros.filter(x=>x.activo).map(x=>`<option value="${x.id}" ${t?.miembro_id===x.id?"selected":""}>Sí: ${esc(x.nombre)}</option>`).join("")}</select></label>
-    <div class="muted tiny">Si es dirigente, elegí su nombre: con su DNI va a ver también sus aportes, su asistencia y su ficha, y le siguen tomando asistencia y cobrando como a cualquier dirigente.</div>
+    ${selectYo(t)}
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
     try{ const yo = Number(s.querySelector("#fYo").value)||null;
       const r = await rpc("guardar_autoridad",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
-      if(yo !== (t?.miembro_id??null)) await rpc("vincular_autoridad",{p_codigo:S.codigo,p_id:r.id,p_miembro:yo});
+      if(yo !== (t?.miembro_id??null)) await rpc("vincular_dirigente",{p_codigo:S.codigo,p_id:r.id,p_miembro:yo});
       await guardarDni("tesorero", r.id, s.querySelector("#fDni").value, t?dniDe("tesorero",t.id):"");
       cerrar(); await recargar(); toast("Autoridad guardada"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true, true);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
@@ -1503,10 +1526,13 @@ function hojaTesorero(t){
     ${campoDni(t?dniDe("tesorero",t.id):"")}
     <div class="grid2"><label>Celular<input id="fCel" inputmode="tel" placeholder="381 555 0101" value="${esc(t?.celular||"")}"></label>
     <label>Mail<input id="fMail" type="email" value="${esc(t?.email||"")}"></label></div>
+    ${selectYo(t)}
     <div class="err" id="fErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="fOk">${I("check")} Guardar</button></div>`,
   (s, cerrar)=>{ const b=s.querySelector("#fOk"); b.onclick=()=>ocupado(b, async()=>{
-    try{ const r = await rpc("guardar_tesorero",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+    try{ const yo = Number(s.querySelector("#fYo").value)||null;
+      const r = await rpc("guardar_tesorero",{p_codigo:S.codigo,p_id:t?.id??null,p_nombre:s.querySelector("#fNom").value,p_celular:s.querySelector("#fCel").value,p_email:s.querySelector("#fMail").value});
+      if(yo !== (t?.miembro_id??null)) await rpc("vincular_dirigente",{p_codigo:S.codigo,p_id:r.id??t.id,p_miembro:yo});
       await guardarDni("tesorero", r.id, s.querySelector("#fDni").value, t?dniDe("tesorero",t.id):"");
       cerrar(); await recargar(); toast("Tesorero guardado"); if(!t) hojaLink(r.nombre, r.celular, r.codigo, true);
     }catch(e){ const er=s.querySelector("#fErr"); er.textContent=e.message; er.hidden=false; } }); });
@@ -1582,6 +1608,7 @@ function calcTotal(){
 function montarTesorero(){
   const m = $("vMain");
   m.querySelector("[data-salir]").onclick = salir;
+  const mc = m.querySelector("[data-mi-cuenta]"); if(mc) mc.onclick = ()=>{ S.tab = "yo"; render(); scrollTo({top:0}); };
   m.onclick = async e => {
     const b = e.target.closest("button,[data-mem]"); if(!b) return;
     const ds = b.dataset;
