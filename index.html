@@ -976,6 +976,7 @@ function fichaHTML(f){
     <div class="fdet" data-det="mensajes" hidden><h3>Mensajes dados</h3>${mensajesHTML(f.mensajes_lista)}</div>
     <div class="row small"><span class="muted">DNI</span><b class="num">${f.dni?esc(f.dni):"—"}</b></div>
     ${f.fecha_nacimiento?`<div class="row small"><span class="muted">Fecha de nacimiento</span><b class="num">${fechaAR(f.fecha_nacimiento)}</b></div>`:""}
+    ${f.domicilio?`<div class="row small" style="gap:12px"><span class="muted">Domicilio</span><b style="text-align:right">${esc(f.domicilio)}</b></div>`:""}
     ${f.meses_rodaje!==null?`<div class="muted tiny">El rodaje se cuenta desde ${f.rodaje_desde==="inicio"?`el ${fechaAR(f.inicio_rodaje)} (inicio del rodaje)`:`la jornada (${fechaAR(f.fecha_jornada)})`}. Edad y rodaje se actualizan solos.</div>`:""}
     ${lista("Cursos intensivos", f.cursos_intensivos||[])}
     ${lista("Cursos extensivos", f.cursos_extensivos||[])}`;
@@ -1006,6 +1007,7 @@ function hojaEditarFicha(f){
     <label>DNI<input id="fiDni" inputmode="numeric" value="${esc(f.dni||"")}" placeholder="Sin puntos"></label></div>
     <div class="grid2"><label>Fecha de la jornada<input id="fiJor" type="date" value="${f.fecha_jornada||""}"></label>
     <label>Fecha de nacimiento<input id="fiNac" type="date" value="${f.fecha_nacimiento||""}"></label></div>
+    <label>Domicilio<input id="fiDom" value="${esc(f.domicilio||"")}" placeholder="Calle, número, barrio"></label>
     <label>Inicio del rodaje (opcional)<input id="fiRod" type="date" value="${f.inicio_rodaje||""}"></label>
     <div class="muted small">Si dejás el inicio del rodaje vacío, los meses se cuentan desde la jornada.</div>
     <h3>Equipos <span class="muted small">(Alfa en el que sirvió y equipo)</span></h3><div class="list" id="fiEQ">${listaEq()}</div>
@@ -1039,7 +1041,7 @@ function hojaEditarFicha(f){
         const pend = [["#fiCInuevo",ci],["#fiCEnuevo",ce]]; pend.forEach(([sel,arr])=>{ const v=s.querySelector(sel).value.trim(); if(v) arr.push(v); });
         agregarEq(); agregarMs();
         await rpc("guardar_ficha",{p_codigo:S.codigo,p_miembro:f.id,p_datos:{numero_alfa:s.querySelector("#fiAlfa").value,fecha_jornada:s.querySelector("#fiJor").value,
-          fecha_nacimiento:s.querySelector("#fiNac").value,inicio_rodaje:s.querySelector("#fiRod").value,equipos_lista:eqs,mensajes_lista:mss,
+          fecha_nacimiento:s.querySelector("#fiNac").value,inicio_rodaje:s.querySelector("#fiRod").value,domicilio:s.querySelector("#fiDom").value,equipos_lista:eqs,mensajes_lista:mss,
           cursos_intensivos:ci,cursos_extensivos:ce}});
         if((s.querySelector("#fiDni").value||"").replace(/\D/g,"") !== (f.dni||"")) await rpc("set_dni",{p_codigo:S.codigo,p_tipo:"miembro",p_id:f.id,p_dni:s.querySelector("#fiDni").value});
         cerrar(); await recargar(); toast("Ficha guardada"); hojaFicha(f.id);
@@ -1051,13 +1053,13 @@ async function exportarFichas(){
   try{
     await cargarXLSX();
     const d = await rpc("export_fichas",{p_codigo:S.codigo});
-    const cab = ["Dirigente","DNI","Fecha de nacimiento","Edad","N° de Alfa","Fecha de jornada","Inicio del rodaje","Meses de rodaje","Equipos","Detalle de equipos","Mensajes dados","Detalle de mensajes","Cursos intensivos","Cant. intensivos","Cursos extensivos","Cant. extensivos","Tesorero","Celular"];
+    const cab = ["Dirigente","DNI","Fecha de nacimiento","Edad","N° de Alfa","Fecha de jornada","Inicio del rodaje","Meses de rodaje","Equipos","Detalle de equipos","Mensajes dados","Detalle de mensajes","Cursos intensivos","Cant. intensivos","Cursos extensivos","Cant. extensivos","Tesorero","Celular","Domicilio"];
     const filas = [[`Fichas de dirigentes · ${d.parroquia}`],[`Generado el ${d.generado}`],[], cab,
       ...d.fichas.map(f=>[f.nombre, f.dni||"", fechaAR(f.fecha_nacimiento), f.edad??"", f.numero_alfa||"", fechaAR(f.fecha_jornada), fechaAR(f.inicio_rodaje), f.meses_rodaje??"",
         f.equipos, porFecha(f.equipos_lista).map(e=>`${e.alfa?"Alfa "+e.alfa+" · ":""}${e.equipo||""}`).join("; "),
         f.mensajes, porFecha(f.mensajes_lista).map(m=>(m.tema||"")+(m.fecha||m.lugar?` (${[fechaAR(m.fecha),m.lugar].filter(Boolean).join(", ")})`:"")).join("; "),
-        (f.cursos_intensivos||[]).join(", "), (f.cursos_intensivos||[]).length, (f.cursos_extensivos||[]).join(", "), (f.cursos_extensivos||[]).length, f.tesorero||"", f.celular||""])];
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaXLSX(filas, [24,12,14,6,10,14,14,10,9,40,10,50,40,10,40,10,18,16]), "Fichas");
+        (f.cursos_intensivos||[]).join(", "), (f.cursos_intensivos||[]).length, (f.cursos_extensivos||[]).join(", "), (f.cursos_extensivos||[]).length, f.tesorero||"", f.celular||"", f.domicilio||""])];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaXLSX(filas, [24,12,14,6,10,14,14,10,9,40,10,50,40,10,40,10,18,16,40]), "Fichas");
     XLSX.writeFile(wb, `Fichas ${fechaArchivo()}.xlsx`); toast("Excel descargado");
   }catch(e){ toast(e.message); }
 }
