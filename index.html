@@ -344,7 +344,7 @@ async function entrar(cod){
 }
 async function recargar(){
   if(S.staff) S.codigo = S.staff.codigo;
-  S.data = await rpc("entrar", {p_codigo:S.codigo});
+  S.data = await rpc("entrar", {p_codigo:S.codigo}); S.fichasGuia = null;
   await cargarExtras();
   render();
 }
@@ -391,6 +391,7 @@ function cabecera(nombre, sub, sun){
   return `<div class="head"><div class="avatar ${sun?"sun":""}">${esc(ini(nombre))}</div>
     <div class="who"><b>Hola, ${esc(primer(nombre))}</b><span>${esc(sub)}</span></div>
     ${S.staff && !S.aut && S.yo && S.tab!=="yo" ? `<button class="btn soft sm" data-mi-cuenta style="margin-right:6px">${I("heart","sm")} Mi cuenta</button>` : ""}
+    ${S.data && S.data.tipo==="guia" && !S.aut && S.tab!=="yo" ? `<button class="iconbtn" data-buscador aria-label="Buscar en las fichas" style="margin-right:6px">${I("search")}</button>` : ""}
     <button class="iconbtn" data-salir aria-label="Salir">${I("logout")}</button></div>`;
 }
 
@@ -995,6 +996,88 @@ async function hojaFicha(mid){
       <div class="actions">${S.data.tipo==="guia"?`<button class="btn" data-editar-ficha>${I("edit")} Editar ficha</button>`:""}<button class="btn soft" data-cerrar>Cerrar</button></div>`,
       (sh, cerrar)=>{ const b = sh.querySelector("[data-editar-ficha]"); if(b) b.onclick = ()=>{ cerrar(); hojaEditarFicha(f); }; });
   }catch(e){ toast(e.message); }
+}
+// ===== Buscador de fichas (solo guía) =====
+const sinTilde = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const RELLENO = new Set("decime deci dime mostrame mostra quiero ver que cuales cual quien quienes dio dieron hizo hicieron sirvio sirvieron tiene tienen tuvo de del la el los las un una en por y a me al con su sus tal persona dirigente dirigentes".split(" "));
+function interpretarBusqueda(texto){
+  const ws = sinTilde(texto).replace(/[^a-z0-9ñ ]/g," ").split(/\s+/).filter(Boolean);
+  let tipo = null; const resto = [];
+  for(const w of ws){
+    if(/^mensajes?$/.test(w)) tipo = tipo||"mensajes";
+    else if(/^equipos?$/.test(w)) tipo = tipo||"equipos";
+    else if(/^(cursos?|intensivos?|extensivos?)$/.test(w)) tipo = tipo||"cursos";
+    else if(!RELLENO.has(w)) resto.push(w);
+  }
+  return {tipo, palabras: resto};
+}
+function itemsDeFicha(f){
+  const out = [];
+  for(const x of (f.mensajes_lista||[])) out.push({tipo:"mensajes", ic:"msg", cls:"sun", t:x.tema||"Mensaje", sub:[fechaAR(x.fecha), x.lugar].filter(Boolean).join(" · "), fecha:x.fecha||"", txt:sinTilde([x.tema,x.lugar].join(" "))});
+  for(const x of (f.equipos_lista||[])) out.push({tipo:"equipos", ic:"users", cls:"", t:(x.alfa?`Alfa ${x.alfa} · `:"")+(x.equipo||"Equipo"), sub:fechaAR(x.fecha), fecha:x.fecha||"", txt:sinTilde([x.equipo,x.alfa?"alfa "+x.alfa:""].join(" "))});
+  for(const c of (f.cursos_intensivos||[])) out.push({tipo:"cursos", ic:"award", cls:"ok", t:c, sub:"Curso intensivo", fecha:"", txt:sinTilde(c+" intensivo")});
+  for(const c of (f.cursos_extensivos||[])) out.push({tipo:"cursos", ic:"award", cls:"ok", t:c, sub:"Curso extensivo", fecha:"", txt:sinTilde(c+" extensivo")});
+  return out;
+}
+function buscarEnFichas(fichas, texto, filtro){
+  const {tipo, palabras} = interpretarBusqueda(texto);
+  const cat = filtro!=="todo" ? filtro : tipo;
+  const res = [];
+  for(const f of fichas){
+    const nom = sinTilde(f.nombre);
+    let items = itemsDeFicha(f).filter(x=> !cat || x.tipo===cat);
+    // Palabras que coinciden con el nombre de la persona
+    const enNombre = palabras.filter(w=> nom.split(/\s+/).some(n=> n.startsWith(w)));
+    const resto = palabras.filter(w=> !enNombre.includes(w));
+    const porNombre = enNombre.length>0;
+    if(palabras.length && !porNombre){
+      items = items.filter(x=> palabras.every(w=> x.txt.includes(w)));
+      if(!items.length) continue;
+    } else if(porNombre && resto.length){
+      const fil = items.filter(x=> resto.every(w=> x.txt.includes(w)));
+      if(!fil.length) continue; items = fil;
+    } else if(!palabras.length && cat && !items.length) continue;
+    else if(!palabras.length && !cat) continue;
+    items.sort((a,c)=> String(c.fecha).localeCompare(String(a.fecha)));
+    res.push({f, items, porNombre});
+  }
+  res.sort((a,c)=> (c.porNombre-a.porNombre) || (c.items.length-a.items.length) || a.f.nombre.localeCompare(c.f.nombre));
+  return {res, cat, palabras};
+}
+async function hojaBuscador(){
+  const cats = [["todo","Todo"],["mensajes","Mensajes"],["equipos","Equipos"],["cursos","Cursos"]];
+  let filtro = S.buscaFiltro || "todo";
+  abrirHoja(`<h2>${I("search")} Buscar en las fichas</h2>
+    <input id="bzQ" type="search" placeholder="Ej.: mensajes de Juan, o un tema" autocomplete="off" value="${esc(S.buscaQ||"")}">
+    <div class="filters" id="bzF" style="margin:10px 0">${cats.map(([id,t])=>`<button type="button" data-bzf="${id}" aria-pressed="${filtro===id}">${t}</button>`).join("")}</div>
+    <div id="bzR"><div class="muted small">Cargando fichas…</div></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cerrar</button></div>`,
+  async (s) => {
+    const q = s.querySelector("#bzQ"), r = s.querySelector("#bzR");
+    try{
+      if(!S.fichasGuia) S.fichasGuia = (await rpc("export_fichas",{p_codigo:S.codigo})).fichas || [];
+    }catch(e){ r.innerHTML = `<div class="muted small">No se pudieron cargar las fichas: ${esc(e.message)}</div>`; return; }
+    const pintar = () => {
+      S.buscaQ = q.value; S.buscaFiltro = filtro;
+      s.querySelectorAll("[data-bzf]").forEach(b=> b.setAttribute("aria-pressed", b.dataset.bzf===filtro));
+      const {res, cat, palabras} = buscarEnFichas(S.fichasGuia, q.value, filtro);
+      if(!palabras.length && !cat){ r.innerHTML = `<div class="muted small">Escribí un nombre, un tema de mensaje, un equipo o un curso. También podés tocar <b>Mensajes</b>, <b>Equipos</b> o <b>Cursos</b> para ver a todos los que tienen alguno cargado.</div>`; return; }
+      if(!res.length){ r.innerHTML = `<div class="muted small">No encontré nada${palabras.length?` para “${esc(q.value.trim())}”`:""}.</div>`; return; }
+      const nombreCat = {mensajes:"mensajes", equipos:"equipos", cursos:"cursos"};
+      r.innerHTML = `<div class="muted tiny" style="margin-bottom:6px">${res.length} ${res.length===1?"dirigente":"dirigentes"}${cat?` · ${nombreCat[cat]}`:""}</div>
+        <div class="list">${res.map(({f,items})=>`<div class="item" style="align-items:flex-start">
+          <div class="avatar sm">${esc(ini(f.nombre))}</div>
+          <div class="l"><div class="t">${esc(f.nombre)}${f.numero_alfa?` <span class="muted small">· Alfa ${esc(f.numero_alfa)}</span>`:""}</div>
+            ${items.length ? items.map(x=>`<div class="small" style="display:flex;gap:6px;align-items:baseline;margin-top:4px"><span>${I(x.ic,"sm")}</span><span><b>${esc(x.t)}</b>${x.sub?` <span class="muted tiny">${esc(x.sub)}</span>`:""}</span></div>`).join("")
+              : `<div class="muted small">${cat?`Sin ${nombreCat[cat]} cargados.`:"No tiene mensajes, equipos ni cursos cargados."}</div>`}
+          </div>
+          <button class="btn ghost sm" data-bz-ficha="${f.id}">Ficha ›</button></div>`).join("")}</div>`;
+    };
+    let tm; q.oninput = () => { clearTimeout(tm); tm = setTimeout(pintar, 120); };
+    s.querySelectorAll("[data-bzf]").forEach(b=> b.onclick = () => { filtro = b.dataset.bzf; pintar(); });
+    r.onclick = e => { const b = e.target.closest("[data-bz-ficha]"); if(b) hojaFicha(Number(b.dataset.bzFicha)); };
+    pintar();
+  });
 }
 function hojaEditarFicha(f){
   const ci = [...(f.cursos_intensivos||[])], ce = [...(f.cursos_extensivos||[])];
@@ -1612,6 +1695,7 @@ function montarTesorero(){
   const m = $("vMain");
   m.querySelector("[data-salir]").onclick = salir;
   const mc = m.querySelector("[data-mi-cuenta]"); if(mc) mc.onclick = ()=>{ S.tab = "yo"; render(); scrollTo({top:0}); };
+  const bz = m.querySelector("[data-buscador]"); if(bz) bz.onclick = () => hojaBuscador();
   m.onclick = async e => {
     const b = e.target.closest("button,[data-mem]"); if(!b) return;
     const ds = b.dataset;
