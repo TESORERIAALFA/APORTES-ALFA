@@ -95,6 +95,11 @@ button,input,select{font:inherit;color:inherit}
 .desg .dd{opacity:.85;font-size:.82rem}
 .desg .num{font-weight:800}
 .desg.claro{background:var(--bad-soft);color:var(--bad)}
+.rp{display:flex;flex-direction:column;gap:8px}
+.rp-f{display:flex;gap:10px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:10px 12px}
+.rp-f .l{flex:1;min-width:0}.rp-f .t{font-weight:800}
+.rp-f input{width:120px;flex:none;text-align:right}
+.rp-tot{display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem;padding:4px 2px}
 .hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
 @media (prefers-color-scheme: dark){.hero.deuda{background:linear-gradient(140deg,#C23B3B,#7E1F1F)}}
 .hero.deuda .btn{color:#9C2727}
@@ -692,38 +697,44 @@ function montarMiembro(){
   const pg = $("vMain").querySelector("[data-pagar]"); if(pg) pg.onclick = hojaPago;
 }
 function hojaPago(){
-  const ev = S.data.eventos;
+  const ev = S.data.eventos || [], cs = S.data.cuenta.conceptos || [];
+  const saldoDe = id => { const c = cs.find(x=> (x.evento_id ?? null) === id); return c ? Number(c.saldo)||0 : 0; };
+  const filas = [{id:null, nombre:"Aportes", saldo:saldoDe(null)}].concat(ev.map(e=>({id:e.id, nombre:e.nombre, saldo:saldoDe(e.id), pct:Number(e.pct_aporte)||0})));
+  const debeAlgo = filas.some(f=>f.saldo>0);
   abrirHoja(`<h2>Informar un pago por transferencia</h2>
-    <div class="muted small">Subí la foto o el PDF del comprobante. Tu tesorero lo revisa y te llega el recibo por mail. Si pagaste en efectivo, lo carga tu tesorero.</div>
-    <label>¿Qué estás pagando?<select id="pConcepto"><option value="">Aporte mensual</option>${ev.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
-    <label id="pCantBox" hidden>¿Cuántas unidades pagás?<input id="pCant" type="number" inputmode="numeric" min="1" value="1"></label>
-    <div class="estado neutral small" id="pPctAviso" hidden></div>
-    <label>Monto que transferiste ($)<input id="pMonto" type="number" inputmode="numeric" min="1" placeholder="Ej.: ${Math.round(S.data.cuenta.miembro.aporte_mensual)||10000}"></label>
+    <div class="muted small">Subí la foto o el PDF del comprobante. Si en una misma transferencia pagaste varias cosas (por ejemplo aporte y agendas), escribí cuánto va a cada una. Tu tesorero lo revisa y te llega el recibo con el detalle.</div>
+    <div class="rp">${filas.map((f,i)=>`<div class="rp-f"><div class="l"><div class="t">${esc(f.nombre)}</div>
+        <div class="tiny ${f.saldo>0?"debt":"muted"}">${f.saldo>0?`Debés ${fmt(f.saldo)}`:"No debés nada"}${f.pct>0?` · el ${pctTxt(f.pct)} va a tu aporte`:""}</div></div>
+        <input data-rp="${i}" type="number" inputmode="numeric" min="0" placeholder="$ 0" aria-label="Monto para ${esc(f.nombre)}"></div>`).join("")}</div>
+    ${debeAlgo?`<button class="btn soft sm" id="pTodo" type="button">${I("check","sm")} Completar con todo lo que debo</button>`:""}
+    <div class="rp-tot"><span>Total transferido</span><span class="num" id="pTotal">${fmt(0)}</span></div>
     <label class="file" id="pFileBox">${I("upload")}<span id="pFileTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
       <input id="pArchivo" type="file" accept="image/*,application/pdf"></label>
     <div class="err" id="pErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="pEnviar">${I("send")} Enviar</button></div>`,
   (s, cerrar)=>{
-    const selC = s.querySelector("#pConcepto"), cantBox = s.querySelector("#pCantBox"), cant = s.querySelector("#pCant"), montoI = s.querySelector("#pMonto");
-    const calc = ()=>{ const e = ev.find(x=>String(x.id)===selC.value); cantBox.hidden = !e;
-      if(e){ cantBox.firstChild.textContent = `¿Cuántas ${e.unidad_plural} pagás? (${fmt(e.precio)} c/u)`; montoI.value = Math.round((Number(cant.value)||0)*e.precio); }
-      const av = s.querySelector("#pPctAviso"); av.hidden = !(e && e.pct_aporte>0);
-      if(e && e.pct_aporte>0) av.innerHTML = `${I("heart","sm")}<span>El ${pctTxt(e.pct_aporte)} de lo que pagues de ${esc(e.nombre)} se suma a tu aporte: <b>${fmt((Number(montoI.value)||0)*e.pct_aporte/100)}</b>.</span>`; };
-    montoI.addEventListener("input", calc);
-    selC.onchange = ()=>{ if(!ev.find(x=>String(x.id)===selC.value)) montoI.value=""; calc(); }; cant.oninput = calc;
+    const ins = [...s.querySelectorAll("[data-rp]")];
+    const partes = () => ins.map(x=>({f:filas[Number(x.dataset.rp)], monto:Math.round(Number(x.value)||0)})).filter(x=>x.monto>0);
+    const total = () => partes().reduce((t,x)=>t+x.monto,0);
+    const upd = () => { s.querySelector("#pTotal").textContent = fmt(total()); };
+    ins.forEach(x=> x.addEventListener("input", upd));
+    const todo = s.querySelector("#pTodo");
+    if(todo) todo.onclick = ()=>{ ins.forEach(x=>{ const f = filas[Number(x.dataset.rp)]; x.value = f.saldo>0 ? Math.round(f.saldo) : ""; }); upd(); };
     const inp = s.querySelector("#pArchivo");
     inp.onchange = ()=>{ const f=inp.files[0]; s.querySelector("#pFileBox").classList.toggle("has",!!f); s.querySelector("#pFileTxt").innerHTML = f?`<b>${esc(f.name)}</b><br><span class="small">Tocá para cambiarlo</span>`:"<b>Tocá para elegir el comprobante</b>"; };
     const btn = s.querySelector("#pEnviar"), err = s.querySelector("#pErr");
     btn.onclick = () => ocupado(btn, async ()=>{
       err.hidden = true;
       try{
-        const monto = Number(s.querySelector("#pMonto").value); let f = inp.files[0];
-        if(!(monto>0)) throw new Error("Escribí el monto que transferiste.");
+        const ps = partes(); let f = inp.files[0];
+        if(!ps.length) throw new Error("Escribí cuánto pagaste en al menos un concepto.");
         if(!f) throw new Error("Elegí la foto o el PDF del comprobante.");
         btn.innerHTML = "Enviando…";
         f = await comprimir(f);
         if(f.size > 10*1024*1024) throw new Error("El archivo pesa más de 10 MB.");
-        const fd = new FormData(); fd.append("codigo",S.codigo); fd.append("monto",String(monto)); fd.append("evento_id", s.querySelector("#pConcepto").value); fd.append("archivo", f);
+        const fd = new FormData(); fd.append("codigo",S.codigo); fd.append("archivo", f);
+        if(ps.length===1){ fd.append("monto", String(ps[0].monto)); fd.append("evento_id", ps[0].f.id===null?"":String(ps[0].f.id)); }
+        else { fd.append("monto", String(total())); fd.append("reparto", JSON.stringify(ps.map(x=>({evento_id:x.f.id, monto:x.monto})))); }
         await fnComprobantes(fd);
         cerrar(); await recargar(); toast("¡Listo! Tu tesorero va a revisar el comprobante.");
       }catch(e){ err.textContent=e.message; err.hidden=false; btn.innerHTML=`${I("send")} Enviar`; }
@@ -747,7 +758,8 @@ function tabInicio(){
     <div class="row"><h2>${I("file")} Comprobantes para revisar</h2>${pend.length?`<span class="pill warn">${pend.length}</span>`:""}</div>
     <div class="list" id="tPend">${pend.length ? pend.map(p=>`
       <div class="item" style="flex-wrap:wrap"><div class="avatar sm">${esc(ini(p.miembro))}</div>
-        <div class="l"><div class="t">${esc(p.miembro)}</div><div class="muted small">${esc(p.concepto)} · ${p.fecha}</div></div>
+        <div class="l"><div class="t">${esc(p.miembro)}</div><div class="muted small">${p.detalle&&p.detalle.length>1?"Una transferencia repartida":esc(p.concepto)} · ${p.fecha}</div>
+          ${p.detalle&&p.detalle.length>1?`<div class="small">${p.detalle.map(x=>`${esc(x.concepto)}: <b>${fmt(x.monto)}</b>`).join(" · ")}</div>`:""}</div>
         <div class="num" style="font-weight:900;font-size:1.1rem">${fmt(p.monto)}</div>
         <div class="actions" style="width:100%">
           ${p.tiene_comprobante?`<button class="btn soft sm" data-ver="${p.id}">${I("file","sm")} Ver</button>`:`<span class="muted small" style="align-self:center">Sin archivo</span>`}
@@ -1655,7 +1667,7 @@ function montarExtras(){
 // ===== Recibo =====
 function textoRecibo(r){
   const det = r.cuenta.conceptos.filter(c=>c.saldo>0).map(c=>`• ${c.nombre}: ${fmt(c.saldo)}`).join("\n");
-  return `*${r.parroquia}* · Recibo N° ${r.recibo_nro}\n${r.miembro}\nFecha: ${r.fecha} · ${r.medio}\nConcepto: ${r.concepto}\nMonto recibido: *${fmt(r.monto)}*` +
+  return `*${r.parroquia}* · Recibo N° ${r.recibo_nro}\n${r.miembro}\nFecha: ${r.fecha} · ${r.medio}\n${r.detalle&&r.detalle.length>1?`Detalle:\n${r.detalle.map(x=>`• ${x.concepto}: ${fmt(x.monto)}`).join("\n")}`:`Concepto: ${r.concepto}`}\nMonto recibido: *${fmt(r.monto)}*` +
     (r.pct_aporte>0 ? `\nSe suma a tu aporte: ${fmt(r.monto*r.pct_aporte/100)} (${pctTxt(r.pct_aporte)})` : "") +
     `\n\nSaldo pendiente: ${fmt(r.cuenta.saldo)}` +
     (det ? "\n"+det : "\n¡Estás al día! Gracias.") +
