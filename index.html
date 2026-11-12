@@ -68,6 +68,28 @@ button,input,select{font:inherit;color:inherit}
 .hero .chip{align-self:flex-start;background:rgba(255,255,255,.18);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.88rem;display:flex;gap:6px;align-items:center}
 .hero .chip.ok{background:#E6F7EE;color:#14663F} .hero .chip.bad{background:#FFE7E7;color:#9C2727}
 .hero .btn{background:#fff;color:#23398F}
+.org{display:flex;flex-direction:column;align-items:stretch}
+.org-n{border-radius:14px;padding:10px 12px;background:var(--surface);border:2px solid var(--line);text-align:center}
+.org-n .r{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.org-n .p{font-weight:800}
+.org-n.top{background:var(--brand);border-color:var(--brand);color:#fff}.org-n.top .r{color:rgba(255,255,255,.85)}
+.org-n.rama{background:var(--brand-soft);border-color:transparent;color:var(--brand)}.org-n.rama .r{color:var(--brand)}
+.org-v{width:2px;height:14px;background:var(--line);margin:0 auto}
+.org-ramas{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:720px){.org-ramas{grid-template-columns:1fr 1fr}}
+.org-areas{display:flex;flex-direction:column;gap:8px;border-left:2px solid var(--line);margin-left:14px;padding-left:12px}
+.org-a{border-radius:12px;background:var(--bg);padding:10px 12px}
+.org-a .an{font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.org-a .g{font-size:.85rem;margin-top:4px}
+.org-a .i{font-size:.8rem;color:var(--muted);margin-top:2px}
+.ar-row{display:flex;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.list>.ar-row:first-child{border-top:0}
+.ar-row .l{flex:1;min-width:0}.ar-row .t{font-weight:800}
+.ar-row .r{text-align:right;flex:none}
+.ar-det{background:var(--bg);border-radius:12px;padding:10px 12px;margin:0 0 8px;font-size:.85rem;display:flex;flex-direction:column;gap:6px}
+.ar-res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mini-asis{display:flex;gap:4px;flex-wrap:wrap}
+.mini-asis .pill{font-size:.7rem;padding:3px 6px}
 .hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
 @media (prefers-color-scheme: dark){.hero.deuda{background:linear-gradient(140deg,#C23B3B,#7E1F1F)}}
 .hero.deuda .btn{color:#9C2727}
@@ -213,6 +235,7 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-org" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-3h14v3"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
   <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
@@ -353,7 +376,10 @@ async function recargar(){
   render();
 }
 async function cargarExtras(){
-  if(S.data.tipo==="miembro"){ [S.asis, S.ficha] = await Promise.all([rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null), rpc("mi_ficha",{p_codigo:S.codigo}).catch(()=>null)]); return; }
+  S.areaDet = {};
+  const org = rpc("organigrama",{p_codigo:S.codigo}).then(r=>S.org=r).catch(()=>S.org=null);
+  if(S.data.tipo==="miembro"){ [S.asis, S.ficha] = await Promise.all([rpc("mi_asistencia",{p_codigo:S.codigo}).catch(()=>null), rpc("mi_ficha",{p_codigo:S.codigo}).catch(()=>null), org]); return; }
+  await org;
   if(S.data.tipo==="autoridad"){
     S.aut = S.staff = {data:S.data, codigo:S.codigo}; S.gastos=null; S.kiosco=null;
     const yc = S.data.yo_codigo;
@@ -405,7 +431,8 @@ function render(){
   const m = $("vMain");
   if(S.staff){ S.data = S.staff.data; S.codigo = S.staff.codigo; }
   if(S.data.tipo==="miembro"){
-    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
+    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].concat(S.org?[["areas",S.org.mis_areas?.length?"Mi área":"Áreas","org"]]:[]).map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
+    if(S.mtab==="areas" && S.org){ m.innerHTML = cabecera(S.data.cuenta.miembro.nombre, `${S.data.parroquia} · ${S.data.anio}`) + vistaAreas(); montarAreas(); return; }
     m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : S.mtab==="ficha" ? vistaMiFicha() : vistaMiembro(); montarMiembro(); return; }
   const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
   if(S.gastos || S.kiosco) tabs.push(["caja","Caja","receipt"]);
@@ -435,19 +462,20 @@ function render(){
 function renderYo(){
   const m = $("vMain");
   S.data = S.yo.data; S.codigo = S.yo.codigo; S.asis = S.yo.asis; S.ficha = S.yo.ficha;
-  const v = ["aportes","asistencia","ficha"].includes(S.mtab) ? S.mtab : "aportes";
-  const html = v==="asistencia" ? vistaMiAsistencia() : v==="ficha" ? vistaMiFicha() : vistaMiembro();
-  const barra = `<div class="filters" style="margin:-4px 0 4px">${[["aportes","Mis aportes"],["asistencia","Mi asistencia"],["ficha","Mi ficha"]].map(([id,t])=>`<button data-ytab="${id}" aria-pressed="${v===id}">${t}</button>`).join("")}</div>
+  const v = ["aportes","asistencia","ficha"].concat(S.org?["areas"]:[]).includes(S.mtab) ? S.mtab : "aportes";
+  const html = v==="areas" ? cabecera(S.data.cuenta.miembro.nombre, `${S.data.parroquia} · ${S.data.anio}`) + vistaAreas() : v==="asistencia" ? vistaMiAsistencia() : v==="ficha" ? vistaMiFicha() : vistaMiembro();
+  const barra = `<div class="filters" style="margin:-4px 0 4px">${[["aportes","Mis aportes"],["asistencia","Mi asistencia"],["ficha","Mi ficha"]].concat(S.org?[["areas","Áreas"]]:[]).map(([id,t])=>`<button data-ytab="${id}" aria-pressed="${v===id}">${t}</button>`).join("")}</div>
     <button class="btn soft block sm" data-volver-staff style="margin-bottom:4px">${I("home","sm")} Volver a la tesorería</button>`;
   m.innerHTML = html;
   const head = m.querySelector(".head"); if(head) head.insertAdjacentHTML("afterend", barra); else m.insertAdjacentHTML("afterbegin", barra);
-  montarMiembro();
+  if(v==="areas") montarAreas(); else montarMiembro();
   m.querySelectorAll("[data-ytab]").forEach(b=> b.onclick = ()=>{ S.mtab = b.dataset.ytab; store("aportes_mtab", S.mtab); render(); scrollTo({top:0}); });
   m.querySelector("[data-volver-staff]").onclick = ()=>{ S.tab = "inicio"; render(); scrollTo({top:0}); };
 }
 function renderAutoridad(){
   const m = $("vMain");
   const tabs = [["asistencia","Asistencia","check"],["fichas","Fichas","users"]];
+  if(S.org) tabs.push(["areas","Áreas","org"]);
   if(S.yo) tabs.push(["yo_aportes","Mis aportes","heart"],["yo_asis","Mi asistencia","clock"],["yo_ficha","Mi ficha","award"]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab = "asistencia";
   $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""} style="font-size:${tabs.length>3?".7rem":".78rem"}">${I(ic)}<span>${t}</span></button>`).join("");
@@ -458,6 +486,7 @@ function renderAutoridad(){
   }
   S.data = S.aut.data; S.codigo = S.aut.codigo;
   const sub = S.yo ? "Autoridad · también dirigente" : "Autoridad · asistencia y fichas";
+  if(S.tab==="areas"){ m.innerHTML = cabecera(S.data.tesorero.nombre, sub) + vistaAreas(); montarAreas(); return; }
   m.innerHTML = cabecera(S.data.tesorero.nombre, sub) + (S.tab==="fichas" ? tabFichas() : tabAsistencia());
   montarTesorero(); montarAsistencia();
   const bus = m.querySelector("#fiBuscar"); if(bus) bus.oninput = () => { const q = bus.value.trim().toLowerCase();
@@ -565,6 +594,75 @@ async function guardarQR(texto, nombre){
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = archivo.name; document.body.appendChild(a); a.click(); a.remove();
     toast("QR guardado en Descargas");
   }catch(e){ toast("No se pudo guardar. Sacale una captura de pantalla al QR."); }
+}
+// ===== Organigrama y áreas =====
+function vistaAreas(){
+  const o = S.org; if(!o) return `<div class="card">No se pudo cargar el organigrama.</div>`;
+  const mias = [];
+  for(const r of o.ramas||[]) for(const a of r.areas) if(a.puedo_ver) mias.push(a);
+  if(mias.length && !mias.find(a=>a.id===S.areaSel)) S.areaSel = mias[0].id;
+  const lista = arr => arr.map(esc).join(", ");
+  const nodo = (rol, personas, cls="") => `<div class="org-n ${cls}"><div class="r">${esc(rol)}</div><div class="p">${personas.length?lista(personas):"—"}</div></div>`;
+  let html = "";
+  if(mias.length){
+    html += `<div class="card"><h2>${I("users")} ${mias.length===1?`Área ${esc(mias[0].nombre)}`:"Áreas a tu cargo"}</h2>
+      ${mias.length>1?`<div class="filters">${mias.map(a=>`<button data-area="${a.id}" aria-pressed="${a.id===S.areaSel}">${esc(a.nombre)}</button>`).join("")}</div>`:""}
+      <div id="areaDet">${areaDetHTML(S.areaDet[S.areaSel])}</div></div>`;
+  }
+  html += `<div class="card"><h2>${I("org")} Organigrama</h2><div class="org">
+    ${nodo("Guía de caravana", o.caravana, "top")}<div class="org-v"></div>
+    <div class="org-ramas">${(o.ramas||[]).map(r=>`<div>
+      ${nodo(r.nombre, r.responsables, "rama")}<div class="org-v"></div>
+      <div class="org-areas">${r.areas.map(a=>`<div class="org-a"><div class="an"><span>${esc(a.nombre)}</span>${a.puedo_ver?`<button class="btn soft sm" data-ver-area="${a.id}">Ver ›</button>`:""}</div>
+        ${a.guias.length?`<div class="g"><span class="muted">${a.guias.length>1?"Guías":"Guía"}:</span> <b>${lista(a.guias)}</b></div>`:""}
+        ${a.instructores.length?`<div class="g"><span class="muted">${a.instructores.length>1?"Instructores":"Instructor/a"}:</span> <b>${lista(a.instructores)}</b></div>`:""}
+        ${a.integrantes.length?`<div class="i">${lista(a.integrantes)}</div>`:""}</div>`).join("")}</div></div>`).join("")}</div>
+    ${o.sin_area?.length?`<div class="muted small" style="margin-top:12px"><b>Sin área asignada:</b> ${lista(o.sin_area)}</div>`:""}
+  </div></div>`;
+  return html;
+}
+function areaDetHTML(d){
+  if(!d) return `<div class="muted small">Cargando integrantes…</div>`;
+  if(d.error) return `<div class="err">${esc(d.error)}</div>`;
+  const is = d.integrantes||[];
+  const deuda = is.reduce((t,x)=>t+Math.max(0,Number(x.deuda)||0),0), conDeuda = is.filter(x=>x.deuda>0).length;
+  const pct = x => x.asis_total ? Math.round(100*(x.asis_presentes+x.asis_servicio)/x.asis_total) : null;
+  const pcts = is.map(pct).filter(v=>v!=null), prom = pcts.length ? Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length) : null;
+  const rolTxt = {guia:"Guía", instructor:"Instructor/a", integrante:""};
+  const est = {presente:["P","ok"], tarde:["T","warn"], servicio:["S","neutral"], ausente:["A","bad"]};
+  return `<div class="ar-res">
+      <div class="stat"><span class="muted tiny">Integrantes</span><b>${is.length}</b></div>
+      <div class="stat"><span class="muted tiny">Con deuda</span><b class="${conDeuda?"debt":"paid"}">${conDeuda}</b></div>
+      <div class="stat"><span class="muted tiny">Asistencia prom.</span><b>${prom==null?"—":prom+"%"}</b></div>
+    </div>
+    ${deuda>0?`<div class="estado bad">${I("alert")}<span>Deuda acumulada del área: ${fmt(deuda)}</span></div>`:`<div class="estado ok">${I("check")}<span>Todo el área está al día con los aportes.</span></div>`}
+    <div class="muted tiny">Tocá un nombre para ver el detalle.</div>
+    <div class="list">${is.map(x=>{ const p = pct(x);
+      return `<div class="ar-row" data-ar="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
+        <div class="l"><div class="t">${esc(x.nombre)}</div><div class="muted tiny">${rolTxt[x.rol]?rolTxt[x.rol]+" · ":""}Asistencia ${p==null?"—":p+"%"}${x.racha>=2?` · <span class="debt">${x.racha} faltas seguidas</span>`:""}</div></div>
+        <div class="r">${x.deuda>0?`<span class="pill bad">Debe ${fmt(x.deuda)}</span>`:`<span class="pill ok">Al día</span>`}</div></div>
+        <div class="ar-det" data-ar-det="${x.id}" hidden>
+          ${x.deuda>0?`<div><b>Deuda acumulada:</b> <span class="debt">${fmt(x.deuda)}</span> <span class="muted">(aportes vencidos y eventos, como agendas)</span></div>`:""}<div><b>Aporte:</b> pagó ${fmt(x.pagado)} de ${fmt(x.anual)} · ${x.falta_anio>0?`le falta <span class="debt">${fmt(x.falta_anio)}</span> para cerrar el año`:`<span class="paid">año cancelado</span>`}${x.pendiente>0?` · ${fmt(x.pendiente)} en revisión`:""}</div>
+          <div><b>Asistencia:</b> ${x.asis_presentes} presentes${x.asis_tardes?` (${x.asis_tardes} tarde)`:""}, ${x.asis_servicio} de servicio, ${x.asis_ausentes} ausentes de ${x.asis_total}</div>
+          ${x.ultimas?.length?`<div class="mini-asis">${x.ultimas.map(r=>{ const [l,c]=est[r.estado]||["?","off"]; return `<span class="pill ${c}" title="${esc(r.nombre)}">${esc(String(r.fecha).slice(0,5))} ${l}</span>`; }).join("")}</div>`:""}
+        </div>`; }).join("") || `<div class="muted small">Esta área todavía no tiene integrantes.</div>`}</div>`;
+}
+async function cargarArea(id){
+  if(!S.areaDet[id]){
+    const box = $("areaDet"); if(box) box.innerHTML = areaDetHTML(null);
+    try{ S.areaDet[id] = await rpc("area_detalle",{p_codigo:S.codigo, p_area:id}); }
+    catch(e){ S.areaDet[id] = {error:e.message}; }
+  }
+  const b2 = $("areaDet"); if(b2 && S.areaSel===id) b2.innerHTML = areaDetHTML(S.areaDet[id]);
+}
+function montarAreas(){
+  const m = $("vMain");
+  const sal = m.querySelector("[data-salir]"); if(sal) sal.onclick = salir;
+  m.querySelectorAll("[data-area]").forEach(b=> b.onclick = ()=>{ S.areaSel = Number(b.dataset.area); m.querySelectorAll("[data-area]").forEach(x=>x.setAttribute("aria-pressed", x===b)); cargarArea(S.areaSel); });
+  m.querySelectorAll("[data-ver-area]").forEach(b=> b.onclick = ()=>{ S.areaSel = Number(b.dataset.verArea); render(); scrollTo({top:0, behavior:"smooth"}); });
+  const det = $("areaDet");
+  if(det) det.onclick = e => { const r = e.target.closest("[data-ar]"); if(!r) return; const d = det.querySelector(`[data-ar-det="${r.dataset.ar}"]`); if(d) d.hidden = !d.hidden; };
+  if(S.areaSel && det) cargarArea(S.areaSel);
 }
 function montarMiembro(){
   $("vMain").onclick = null; $("vMain").onchange = null;
