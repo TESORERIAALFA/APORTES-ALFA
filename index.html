@@ -90,6 +90,11 @@ button,input,select{font:inherit;color:inherit}
 .ar-res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mini-asis{display:flex;gap:4px;flex-wrap:wrap}
 .mini-asis .pill{font-size:.7rem;padding:3px 6px}
+.desg{display:flex;flex-direction:column;gap:6px;border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.16);font-size:.92rem}
+.desg .dl{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.desg .dd{opacity:.85;font-size:.82rem}
+.desg .num{font-weight:800}
+.desg.claro{background:var(--bad-soft);color:var(--bad)}
 .hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
 @media (prefers-color-scheme: dark){.hero.deuda{background:linear-gradient(140deg,#C23B3B,#7E1F1F)}}
 .hero.deuda .btn{color:#9C2727}
@@ -539,6 +544,21 @@ function icConcepto(nombre){
   if(n.startsWith("aporte")) return ["heart",""];
   return ["gift","sun"];
 }
+// Desglose de deuda: cuánto de aporte y cuánto de cada evento (agendas, etc.)
+function desglose(cs){
+  return (cs||[]).filter(r=>Number(r.saldo)>0).map(r=>{
+    if(r.evento_id===null || r.evento_id===undefined){
+      const meses = r.precio>0 ? Math.round(r.saldo/r.precio) : 0;
+      return {nombre:"Aportes", det: meses>0 ? `${meses} ${meses===1?"mes atrasado":"meses atrasados"}` : "", saldo:Number(r.saldo)};
+    }
+    const u = Number(r.cantidad)===1 ? r.unidad : r.unidad_plural;
+    return {nombre:r.nombre, det:`${r.cantidad} ${u||""}${Number(r.pagado)>0?` · pagaste ${fmt(r.pagado)}`:" · sin pagar"}`, saldo:Number(r.saldo)};
+  });
+}
+function desgloseHTML(cs, cls=""){
+  const d = desglose(cs); if(!d.length) return "";
+  return `<div class="desg ${cls}">${d.map(x=>`<div class="dl"><span><b>${esc(x.nombre)}</b>${x.det?` <span class="dd">· ${esc(x.det)}</span>`:""}</span><span class="num">${fmt(x.saldo)}</span></div>`).join("")}</div>`;
+}
 function conceptosHTML(cs){
   return cs.map(r=>{ const [ic,c]=icConcepto(r.nombre); return `
     <div class="item"><div class="ic ${c}">${I(ic)}</div><div class="l"><div class="t">${esc(r.nombre)}</div>
@@ -567,6 +587,7 @@ function vistaMiembro(){
     <div class="lbl">Deuda acumulada</div>
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
+    ${c.saldo>0?desgloseHTML(c.conceptos):""}
     ${c.pendiente>0?`<div class="small" style="opacity:.9">Tenés ${fmt(c.pendiente)} en comprobantes esperando que tu tesorero los verifique.</div>`:""}
     <button class="btn block" data-pagar>${I("upload")} Informar un pago</button>
   </div>
@@ -639,10 +660,10 @@ function areaDetHTML(d){
     <div class="muted tiny">Tocá un nombre para ver el detalle.</div>
     <div class="list">${is.map(x=>{ const p = pct(x);
       return `<div class="ar-row" data-ar="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
-        <div class="l"><div class="t">${esc(x.nombre)}</div><div class="muted tiny">${rolTxt[x.rol]?rolTxt[x.rol]+" · ":""}Asistencia ${p==null?"—":p+"%"}${x.racha>=2?` · <span class="debt">${x.racha} faltas seguidas</span>`:""}</div></div>
+        <div class="l"><div class="t">${esc(x.nombre)}</div>${x.deuda>0?`<div class="tiny debt" style="font-weight:700">${desglose(x.conceptos).map(d=>`${esc(d.nombre)} ${fmt(d.saldo)}`).join(" · ")}</div>`:""}<div class="muted tiny">${rolTxt[x.rol]?rolTxt[x.rol]+" · ":""}Asistencia ${p==null?"—":p+"%"}${x.racha>=2?` · <span class="debt">${x.racha} faltas seguidas</span>`:""}</div></div>
         <div class="r">${x.deuda>0?`<span class="pill bad">Debe ${fmt(x.deuda)}</span>`:`<span class="pill ok">Al día</span>`}</div></div>
         <div class="ar-det" data-ar-det="${x.id}" hidden>
-          ${x.deuda>0?`<div><b>Deuda acumulada:</b> <span class="debt">${fmt(x.deuda)}</span> <span class="muted">(aportes vencidos y eventos, como agendas)</span></div>`:""}<div><b>Aporte:</b> pagó ${fmt(x.pagado)} de ${fmt(x.anual)} · ${x.falta_anio>0?`le falta <span class="debt">${fmt(x.falta_anio)}</span> para cerrar el año`:`<span class="paid">año cancelado</span>`}${x.pendiente>0?` · ${fmt(x.pendiente)} en revisión`:""}</div>
+          ${x.deuda>0?`<div><b>Deuda acumulada: <span class="debt">${fmt(x.deuda)}</span></b></div>${desgloseHTML(x.conceptos,"claro").replaceAll("pagaste","pagó")}`:""}<div><b>Aporte:</b> pagó ${fmt(x.pagado)} de ${fmt(x.anual)} · ${x.falta_anio>0?`le falta <span class="debt">${fmt(x.falta_anio)}</span> para cerrar el año`:`<span class="paid">año cancelado</span>`}${x.pendiente>0?` · ${fmt(x.pendiente)} en revisión`:""}</div>
           <div><b>Asistencia:</b> ${x.asis_presentes} presentes${x.asis_tardes?` (${x.asis_tardes} tarde)`:""}, ${x.asis_servicio} de servicio, ${x.asis_ausentes} ausentes de ${x.asis_total}</div>
           ${x.ultimas?.length?`<div class="mini-asis">${x.ultimas.map(r=>{ const [l,c]=est[r.estado]||["?","off"]; return `<span class="pill ${c}" title="${esc(r.nombre)}">${esc(String(r.fecha).slice(0,5))} ${l}</span>`; }).join("")}</div>`:""}
         </div>`; }).join("") || `<div class="muted small">Esta área todavía no tiene integrantes.</div>`}</div>`;
