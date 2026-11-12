@@ -535,7 +535,7 @@ function vistaMiembro(){
   return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
   ${S.asis?alertaRacha(S.asis.racha, true):""}
   <div class="hero ${c.saldo>0?"deuda":""}">
-    <div class="lbl">Lo que debés hoy</div>
+    <div class="lbl">Deuda acumulada</div>
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
     ${c.pendiente>0?`<div class="small" style="opacity:.9">Tenés ${fmt(c.pendiente)} en comprobantes esperando que tu tesorero los verifique.</div>`:""}
@@ -657,7 +657,7 @@ function tabDirigentes(){
         <div class="avatar sm">${esc(ini(m.nombre))}</div>
         <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(m.nombre)} ${pill}</div>
           <div class="muted small">${fmt(a.mensual)}/mes · falta ${fmt(a.falta_anio)} del año${d.tipo==="guia"?` · ${m.tesorero?esc(m.tesorero):"sin tesorero"}`:""}</div></div>
-        <div style="text-align:right"><div class="muted tiny">Debe hoy</div><div class="num ${m.saldo>0?"debt":"paid"}">${m.saldo>0?fmt(m.saldo):"Nada"}</div></div>
+        <div style="text-align:right"><div class="muted tiny">Deuda acumulada</div><div class="num ${m.saldo>0?"debt":"paid"}">${m.saldo>0?fmt(m.saldo):"Nada"}</div></div>
         <span class="chev">${I("chev")}</span></button><div class="det" data-det="${m.id}" hidden></div></div>`}).join("")
       : `<div class="empty"><div class="ic">${I("search")}</div>No hay dirigentes con ese filtro.</div>`}</div></div>`;
 }
@@ -1807,7 +1807,7 @@ async function abrirDetalle(b){
     const c = await rpc("cuenta_de",{p_codigo:S.codigo,p_miembro:Number(b.dataset.mem)});
     det.innerHTML = `
       ${aporteHTML(c.aporte, false)}
-      <h3>Por concepto · debe hoy <span class="debt num">${fmt(c.saldo)}</span></h3>
+      <h3>Por concepto · deuda acumulada <span class="debt num">${fmt(c.saldo)}</span></h3>
       <div class="list">${conceptosHTML(c.conceptos)}</div>
       <h3>Historial de pagos</h3>
       <div class="list">${pagosHTML(c.pagos, true)}</div>
