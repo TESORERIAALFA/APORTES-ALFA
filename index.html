@@ -68,6 +68,9 @@ button,input,select{font:inherit;color:inherit}
 .hero .chip{align-self:flex-start;background:rgba(255,255,255,.18);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.88rem;display:flex;gap:6px;align-items:center}
 .hero .chip.ok{background:#E6F7EE;color:#14663F} .hero .chip.bad{background:#FFE7E7;color:#9C2727}
 .hero .btn{background:#fff;color:#23398F}
+.hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
+@media (prefers-color-scheme: dark){.hero.deuda{background:linear-gradient(140deg,#C23B3B,#7E1F1F)}}
+.hero.deuda .btn{color:#9C2727}
 
 /* Botones */
 .btn{border:0;border-radius:14px;padding:13px 16px;font-weight:800;font-size:1rem;cursor:pointer;background:var(--brand);color:var(--brand-ink);display:inline-flex;gap:8px;align-items:center;justify-content:center;text-decoration:none;min-height:48px}
@@ -335,7 +338,8 @@ async function entrar(cod){
     store("aportes_codigo", S.codigo);
     await cargarExtras();
     S.tab = read("aportes_tab_"+S.data.tipo) || "inicio"; if(S.tab==="yo") S.tab = "inicio";
-    S.mtab = read("aportes_mtab") || "aportes";
+    S.mtab = "aportes"; // siempre se entra viendo la cuenta (deuda), no la última pestaña
+    if(S.data.tipo==="autoridad" && S.yo) S.tab = "yo_aportes";
     render();
   }catch(e){
     store("aportes_codigo", null);
@@ -527,10 +531,10 @@ function pagosHTML(ps, reenviar){
 // ===== Vista del dirigente =====
 function vistaMiembro(){
   const d = S.data, c = d.cuenta, m = c.miembro;
-  const chip = c.saldo<=0 ? `<span class="chip ok">${I("check","sm")} Estás al día</span>` : `<span class="chip">${I("clock","sm")} Saldo pendiente</span>`;
+  const chip = c.saldo<=0 ? `<span class="chip ok">${I("check","sm")} Estás al día</span>` : `<span class="chip bad">${I("alert","sm")} Tenés deuda</span>`;
   return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
   ${S.asis?alertaRacha(S.asis.racha, true):""}
-  <div class="hero">
+  <div class="hero ${c.saldo>0?"deuda":""}">
     <div class="lbl">Lo que debés hoy</div>
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
@@ -1862,6 +1866,18 @@ function paginaKiosco(){
     }catch(e){ $("kpErr").textContent = e.message; $("kpErr").hidden = false; }
   });
 }
+// Si la app quedó abierta en segundo plano y se vuelve a ella, mostrar de nuevo la cuenta (deuda) actualizada
+let ocultaDesde = 0;
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden){ ocultaDesde = Date.now(); return; }
+  if(!ocultaDesde || Date.now()-ocultaDesde < 60000 || !S.data) return;
+  ocultaDesde = 0;
+  const tipo = S.aut ? "autoridad" : S.staff ? S.staff.data.tipo : S.data.tipo;
+  if(tipo==="miembro"){ S.mtab = "aportes"; }
+  else if(tipo==="autoridad" && S.yo){ S.tab = "yo_aportes"; }
+  else return;
+  recargar().catch(()=>render()); scrollTo({top:0});
+});
 const desdeLink = new URLSearchParams(location.search).get("c");
 const inicial = desdeLink || read("aportes_codigo");
 if(new URLSearchParams(location.search).has("kiosco")) paginaKiosco();
