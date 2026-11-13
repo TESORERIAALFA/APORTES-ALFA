@@ -99,6 +99,8 @@ button,input,select{font:inherit;color:inherit}
 .desg .num{font-weight:800}
 .desg.claro{background:var(--surface);color:inherit;border:1px solid var(--line)}
 .rp{display:flex;flex-direction:column;gap:8px}
+.rend{border:2px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.rend .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .rp-f{display:flex;gap:10px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:10px 12px}
 .rp-f .l{flex:1;min-width:0}.rp-f .t{font-weight:800}
 .rp-f input{width:120px;flex:none;text-align:right}
@@ -384,6 +386,7 @@ async function entrar(cod){
 }
 async function recargar(){
   if(S.staff) S.codigo = S.staff.codigo;
+  if(S.staff && S.staff.data.tipo!=="autoridad") S.rend = await rpc("rendiciones",{p_codigo:S.codigo}).catch(()=>S.rend);
   S.data = await rpc("entrar", {p_codigo:S.codigo}); S.fichasGuia = null;
   await cargarExtras();
   render();
@@ -405,7 +408,7 @@ async function cargarExtras(){
     return;
   }
   S.aut = null; S.staff = {data:S.data, codigo:S.codigo}; S.yo = null;
-  const tareas = [rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
+  const tareas = [rpc("rendiciones",{p_codigo:S.codigo}).then(r=>S.rend=r).catch(()=>S.rend=null), rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
     rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.yo_codigo){ const yc = S.data.yo_codigo;
     tareas.push(Promise.all([rpc("entrar",{p_codigo:yc}), rpc("mi_asistencia",{p_codigo:yc}).catch(()=>null), rpc("mi_ficha",{p_codigo:yc}).catch(()=>null)])
@@ -470,7 +473,7 @@ function render(){
   if(S.tab==="caja") body = tabCaja();
   if(S.tab==="asistencia") body = tabAsistencia();
   m.innerHTML = cabecera(t.nombre, sub, S.data.tipo==="guia") + body;
-  montarTesorero(); montarExtras(); montarAsistencia(); montarCaja();
+  montarTesorero(); montarExtras(); montarAsistencia(); montarCaja(); montarRendicion();
 }
 function renderYo(){
   const m = $("vMain");
@@ -632,6 +635,60 @@ async function guardarQR(texto, nombre){
     toast("QR guardado en Descargas");
   }catch(e){ toast("No se pudo guardar. Sacale una captura de pantalla al QR."); }
 }
+// ===== Efectivo: rendición al guía o a quien recibe =====
+function rendicionHTML(){
+  const r = S.rend; if(!r) return "";
+  const quien = (r.receptores||[]).join(" o ") || "el guía";
+  const hist = (r.recibido||[]).length ? `<details class="small"><summary class="muted">Últimas rendiciones</summary><div class="list">${r.recibido.map(h=>`<div class="item"><div class="l"><div class="t">${esc(h.tesorero)} → ${esc(h.recibio)}</div><div class="muted tiny">${esc(h.fecha)} · ${h.cobros} ${h.cobros===1?"cobro":"cobros"}</div></div><div class="num paid">${fmt(h.total)}</div></div>`).join("")}</div></details>` : "";
+  const items = it => `<div class="list">${it.map(x=>`<div class="item"><div class="l"><div class="t">${esc(x.miembro)}</div><div class="muted tiny">${esc(x.concepto)} · ${esc(x.fecha)}${x.recibo_nro?` · Recibo ${x.recibo_nro}`:""}</div></div><div class="num">${fmt(x.monto)}</div></div>`).join("")}</div>`;
+  if(r.recibe){
+    const total = (r.grupos||[]).reduce((t,g)=>t+Number(g.total),0);
+    return `<div class="card"><div class="row"><h2>${I("cash")} Efectivo a recibir de los tesoreros</h2>${total>0?`<span class="pill warn">${fmt(total)}</span>`:""}</div>
+      ${(r.grupos||[]).length ? r.grupos.map(g=>`<div class="rend">
+        <div class="row"><div><div class="t" style="font-weight:800">${esc(g.tesorero)}</div><div class="muted tiny">${g.items.length} ${g.items.length===1?"cobro":"cobros"} sin rendir</div></div>
+          <div class="num debt" style="font-size:1.1rem">${fmt(g.total)}</div></div>
+        <details><summary class="muted small">Ver detalle</summary>${items(g.items)}</details>
+        <button class="btn ok block sm" data-recibir="${g.tesorero_id}" data-recibir-nom="${esc(g.tesorero)}" data-recibir-total="${g.total}">${I("check","sm")} Recibí ${fmt(g.total)} de ${esc(primer(g.tesorero))}</button></div>`).join("")
+        : `<div class="empty"><div class="ic ok">${I("check")}</div>Ningún tesorero tiene efectivo pendiente de rendir.</div>`}
+      ${hist}</div>`;
+  }
+  const g = (r.grupos||[])[0];
+  return `<div class="card"><div class="row"><h2>${I("cash")} Efectivo para rendir</h2>${g?`<span class="pill warn">${fmt(g.total)}</span>`:""}</div>
+    ${g ? `<div class="estado bad">${I("alert")}<span>Tenés ${fmt(g.total)} en efectivo para entregar a ${esc(quien)}. Cuando lo reciban, lo marcan en la app.</span></div>${items(g.items)}`
+        : `<div class="estado ok">${I("check")}<span>No tenés efectivo pendiente de rendir.</span></div>`}
+    <button class="btn soft sm" data-tabgo="cobrar">${I("cash","sm")} Cobrar efectivo</button>
+    ${hist}</div>`;
+}
+function montarRendicion(){
+  $("vMain").querySelectorAll("[data-recibir]").forEach(b=> b.onclick = async ()=>{
+    const nom = b.dataset.recibirNom, tot = Number(b.dataset.recibirTotal);
+    if(!(await confirmar("Recibir efectivo", `¿Confirmás que <b>${esc(nom)}</b> te entregó <b>${fmt(tot)}</b> en efectivo?`, "Sí, lo recibí", "ok"))) return;
+    ocupado(b, async ()=>{ try{ const r = await rpc("recibir_rendicion",{p_codigo:S.codigo, p_tesorero:Number(b.dataset.recibir), p_ids:null});
+      S.rend = await rpc("rendiciones",{p_codigo:S.codigo}).catch(()=>S.rend); render(); toast(`Recibido: ${fmt(r.total)} de ${primer(nom)}`); }catch(er){ toast(er.message) } });
+  });
+}
+// Cobro en efectivo con uno o varios conceptos
+async function cobroConceptos(){
+  const box = $("eConceptos"); if(!box) return;
+  const mid = Number($("eMiembro").value);
+  box.innerHTML = `<div class="muted small">Cargando lo que debe…</div>`;
+  let cs = [];
+  try{ const c = await rpc("cuenta_de",{p_codigo:S.codigo, p_miembro:mid}); cs = (c && c.conceptos) || []; }catch(_){}
+  if(Number($("eMiembro").value)!==mid) return;
+  const saldoDe = id => { const c = cs.find(x=>(x.evento_id ?? null)===id); return c ? Number(c.saldo)||0 : 0; };
+  const filas = [{id:null, nombre:"Aportes", saldo:saldoDe(null)}].concat(S.data.eventos.map(e=>({id:e.id, nombre:e.nombre, saldo:saldoDe(e.id)})));
+  S.cobroFilas = filas;
+  box.innerHTML = `<div class="rp">${filas.map((f,i)=>`<div class="rp-f"><div class="l"><div class="t">${esc(f.nombre)}</div>
+      <div class="tiny ${f.saldo>0?"debt":"muted"}">${f.saldo>0?`Debe ${fmt(f.saldo)}`:"No debe nada"}</div></div>
+      <input data-ef="${i}" type="number" inputmode="numeric" min="0" placeholder="$ 0"></div>`).join("")}</div>
+    ${filas.some(f=>f.saldo>0)?`<button class="btn soft sm" id="eTodo" type="button">${I("check","sm")} Completar con todo lo que debe</button>`:""}
+    <div class="rp-tot"><span>Total que te dio</span><span class="num" id="eTotal">${fmt(0)}</span></div>`;
+  const ins = [...box.querySelectorAll("[data-ef]")];
+  const upd = () => { $("eTotal").textContent = fmt(ins.reduce((t,x)=>t+(Math.round(Number(x.value))||0),0)); };
+  ins.forEach(x=>x.addEventListener("input", upd));
+  const todo = $("eTodo"); if(todo) todo.onclick = ()=>{ ins.forEach(x=>{ const f = filas[Number(x.dataset.ef)]; x.value = f.saldo>0?Math.round(f.saldo):""; }); upd(); };
+}
+
 // ===== Organigrama y áreas =====
 // La pestaña de áreas solo la ve quien tiene gente a cargo (guías de área, responsables y guía de caravana)
 const conAreas = () => !!(S.org && S.org.mis_areas && S.org.mis_areas.length);
@@ -761,7 +818,9 @@ function tabInicio(){
   const total = d.miembros.reduce((s,m)=>s+Number(m.saldo),0);
   const atr = d.miembros.filter(m=>!m.aporte.al_dia).length;
   const pend = d.pendientes;
+  if(!d.miembros.length && S.rend) return `${alertasHTML()}${rendicionHTML()}`; // quien solo recibe rendiciones
   return `${alertasHTML()}
+  ${S.rend && S.rend.recibe ? rendicionHTML() : ""}
   <div class="hero">
     <div class="lbl">${d.tipo==="guia"?"Deuda de todos los dirigentes hoy":"Deuda de tus dirigentes hoy"}</div>
     <div class="big num">${fmt(total)}</div>
@@ -780,8 +839,8 @@ function tabInicio(){
           <button class="btn bad sm" data-no="${p.id}">${I("x","sm")} Rechazar</button></div></div>`).join("")
       : `<div class="empty"><div class="ic ok">${I("check")}</div>No hay comprobantes pendientes.</div>`}</div>
   </div>
-  <div class="card"><div class="row"><div><div class="muted small">Efectivo que cobraste</div><div class="num" style="font-weight:900;font-size:1.3rem">${fmt(d.efectivo_cobrado)}</div></div>
-    <button class="btn soft sm" data-tabgo="cobrar">${I("cash","sm")} Cobrar efectivo</button></div></div>`;
+  ${S.rend && !S.rend.recibe ? rendicionHTML() : `<div class="card"><div class="row"><div><div class="muted small">Efectivo que cobraste</div><div class="num" style="font-weight:900;font-size:1.3rem">${fmt(d.efectivo_cobrado)}</div></div>
+    <button class="btn soft sm" data-tabgo="cobrar">${I("cash","sm")} Cobrar efectivo</button></div></div>`}`;
 }
 function tabDirigentes(){
   const d = S.data;
@@ -810,10 +869,9 @@ function tabCobrar(){
   const mOpts = d.miembros.map(m=>`<option value="${m.id}">${esc(m.nombre)}</option>`).join("");
   return `
   <div class="card"><h2>${I("cash")} Registrar pago en efectivo</h2>
-    <div class="muted small">Se aprueba en el momento y al dirigente le llega el recibo por mail.</div>
+    <div class="muted small">Elegí al dirigente y escribí cuánto te dio para cada cosa (aporte, agendas, etc.). Se le acredita en el momento y le podés mandar el recibo por WhatsApp.${S.rend && !S.rend.recibe ? ` El efectivo queda <b>pendiente de rendición</b> hasta que se lo entregues a ${esc((S.rend.receptores||[]).join(" o "))}.` : ""}</div>
     <label>Dirigente<select id="eMiembro">${mOpts}</select></label>
-    <div class="grid2"><label>Concepto<select id="eConcepto"><option value="">Aporte mensual</option>${d.eventos.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
-    <label>Monto ($)<input id="eMonto" type="number" inputmode="numeric" min="1" placeholder="15000"></label></div>
+    <div id="eConceptos"></div>
     <button class="btn block" id="eGuardar">${I("check")} Registrar y generar recibo</button></div>
   <div class="card"><h2>${I("gift")} Entregar un evento</h2>
     <div class="muted small">Locro, lotería, agendas, bonos: se suma a la deuda del dirigente.</div>
@@ -1692,10 +1750,13 @@ function hojaRecibo(r){
   abrirHoja(`<div class="estado ok">${I("check")}<span>Pago aprobado · Recibo N° ${r.recibo_nro}</span></div>
     <div class="muted small">${S.data.tipo==="guia"&&!S.mails?`${I("msg","sm")} Mandale el recibo por WhatsApp.`:r.email?`${I("mail","sm")} Si los mails están encendidos, el recibo le llega solo a <b>${esc(r.email)}</b>. Igual podés mandarlo por WhatsApp.`:`${I("alert","sm")} Este dirigente no tiene mail cargado: pedile al guía que lo agregue.`}</div>
     <div class="receipt">${esc(txt)}</div>
-    <div class="actions">${r.celular?`<a class="btn wa" target="_blank" rel="noopener" href="${waLink(r.celular, txt)}">${I("msg")} Enviar por WhatsApp</a>`:""}
+    <div class="actions"><a class="btn wa" target="_blank" rel="noopener" href="${r.celular?waLink(r.celular, txt):`https://wa.me/?text=${encodeURIComponent(txt)}`}">${I("msg")} Enviar por WhatsApp</a>
+      ${navigator.share?`<button class="btn soft" data-compartir>${I("send")} Compartir</button>`:""}
       <button class="btn soft" data-copiar>${I("copy")} Copiar</button></div>
+    ${r.celular?"":`<div class="muted tiny">No tiene celular cargado: al tocar WhatsApp elegís a quién mandárselo.</div>`}
     <button class="btn ghost" data-cerrar>Cerrar</button>`,
-  (s)=>{ s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(txt);toast("Recibo copiado")}catch(_){toast("No se pudo copiar")} }; });
+  (s)=>{ s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(txt);toast("Recibo copiado")}catch(_){toast("No se pudo copiar")} };
+    const sh = s.querySelector("[data-compartir]"); if(sh) sh.onclick = async ()=>{ try{ await navigator.share({text:txt, title:`Recibo N° ${r.recibo_nro}`}); }catch(_){} }; });
 }
 function hojaLink(nombre, celular, codigo, esTesorero, esAutoridad){
   const link = linkPersonal(codigo);
@@ -1900,9 +1961,12 @@ function montarTesorero(){
   const busca = $("busca");
   if(busca){ busca.oninput = ()=>{ S.busca = busca.value; const pos = busca.selectionStart; render(); const nb=$("busca"); nb.focus(); nb.setSelectionRange(pos,pos); }; }
   if($("aEvento")){ $("aEvento").onchange=calcTotal; $("aCant").oninput=calcTotal; calcTotal(); }
+  if($("eMiembro")){ $("eMiembro").onchange = cobroConceptos; cobroConceptos(); }
   if($("eGuardar")) $("eGuardar").onclick = () => ocupado($("eGuardar"), async ()=>{
-    const monto = Number($("eMonto").value); if(!(monto>0)){ toast("Escribí el monto recibido"); return; }
-    try{ const r = await rpc("registrar_efectivo",{p_codigo:S.codigo,p_miembro:Number($("eMiembro").value),p_evento:$("eConcepto").value?Number($("eConcepto").value):null,p_monto:monto});
+    const filas = S.cobroFilas || [];
+    const reparto = [...document.querySelectorAll("[data-ef]")].map(x=>({evento_id: filas[Number(x.dataset.ef)]?.id ?? null, monto: Math.round(Number(x.value))||0})).filter(x=>x.monto>0);
+    if(!reparto.length){ toast("Escribí cuánto te dio en al menos un concepto"); return; }
+    try{ const r = await rpc("registrar_efectivo_varios",{p_codigo:S.codigo,p_miembro:Number($("eMiembro").value),p_reparto:reparto});
       await recargar(); hojaRecibo(r); }catch(er){ toast(er.message) }
   });
   if($("aGuardar")) $("aGuardar").onclick = () => ocupado($("aGuardar"), async ()=>{
@@ -2023,7 +2087,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611122102";
+const APP_VERSION = "202611122110";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
