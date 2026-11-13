@@ -105,6 +105,8 @@ button,input,select{font:inherit;color:inherit}
 .rp-f .l{flex:1;min-width:0}.rp-f .t{font-weight:800}
 .rp-f input{width:120px;flex:none;text-align:right}
 .rp-tot{display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem;padding:4px 2px}
+.efe{display:flex;gap:8px;align-items:flex-start;background:#FFF4D6;color:#5A3D00;border-radius:12px;padding:10px 12px;font-size:.88rem;line-height:1.35}
+.efe .ico{flex:none;margin-top:2px}
 .hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
 @media (prefers-color-scheme: dark){.hero.deuda{background:linear-gradient(140deg,#C23B3B,#7E1F1F)}}
 .hero.deuda .btn{color:#9C2727}
@@ -593,7 +595,7 @@ function pagosHTML(ps, reenviar){
       ${p.pct_aporte>0?`<span class="pill neutral">${I("heart","sm")} ${fmt(p.monto*p.pct_aporte/100)} al aporte</span>`:""}
       ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}
       ${!reenviar&&p.estado==="verificado"&&p.recibo_nro?`<button class="btn ghost sm" data-mi-recibo="${p.id}">${I("file","sm")} Ver recibo</button>`:""}
-      ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?"Lo tiene tu tesorero: el recibo te llega cuando lo entregue a tesorería.":"Esperando que tesorería verifique el comprobante."}</div>`:""}</div>
+      ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?"Efectivo que le diste a tu tesorero: todavía no lo rindió. El recibo te llega cuando lo entregue a tesorería.":"Esperando que tesorería verifique el comprobante."}</div>`:""}</div>
       <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end"><div class="num" style="font-weight:800">${fmt(p.monto)}</div>${pillEstado(p.estado)}</div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no hay pagos registrados.</div>`;
 }
@@ -609,7 +611,10 @@ function vistaMiembro(){
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
     ${desgloseHTML(c.conceptos, "", c.aporte, true)}
-    ${c.pendiente>0?`<div class="small" style="opacity:.9">Tenés ${fmt(c.pendiente)} en pagos esperando que tesorería los verifique.</div>`:""}
+    ${(()=>{ const pe = (c.pagos||[]).filter(p=>p.estado==="pendiente"&&p.medio==="Efectivo").reduce((t,p)=>t+Number(p.monto),0), pt = Math.max(0, Number(c.pendiente)-pe);
+      const tes = d.tesorero ? primer(d.tesorero.nombre) : "tu tesorero";
+      return (pe>0?`<div class="efe">${I("cash","sm")}<span><b>Le diste ${fmt(pe)} en efectivo a ${esc(tes)}.</b> Ya está registrado: no hace falta que informes el pago. Se te descuenta cuando ${esc(tes)} lo entregue a tesorería.</span></div>`:"")
+        + (pt>0?`<div class="small" style="opacity:.9">Tenés ${fmt(pt)} en comprobantes de transferencia esperando que tesorería los verifique.</div>`:""); })()}
     <button class="btn block" data-pagar>${I("upload")} Informar un pago</button>
   </div>
   <div class="card"><h2>${I("heart")} Mi aporte anual</h2>${aporteHTML(c.aporte, true)}</div>
@@ -2124,7 +2129,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611122116";
+const APP_VERSION = "202611122209";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
