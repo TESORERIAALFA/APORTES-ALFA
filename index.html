@@ -444,8 +444,8 @@ function render(){
   const m = $("vMain");
   if(S.staff){ S.data = S.staff.data; S.codigo = S.staff.codigo; }
   if(S.data.tipo==="miembro"){
-    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].concat(S.org?[["areas",S.org.mis_areas?.length?"Mi área":"Áreas","org"]]:[]).map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
-    if(S.mtab==="areas" && S.org){ m.innerHTML = cabecera(S.data.cuenta.miembro.nombre, `${S.data.parroquia} · ${S.data.anio}`) + vistaAreas(); montarAreas(); return; }
+    $("tabsIn").innerHTML = [["aportes","Mis aportes","heart"],["asistencia","Mi asistencia","check"],["ficha","Mi ficha","users"]].concat(conAreas()?[["areas",S.org.mis_areas.length>1?"Áreas":"Mi área","org"]]:[]).map(([id,t,ic])=>`<button class="tab" data-mtab="${id}" ${S.mtab===id?'aria-current="page"':""} style="font-size:.78rem">${I(ic)}<span>${t}</span></button>`).join("");
+    if(S.mtab==="areas" && conAreas()){ m.innerHTML = cabecera(S.data.cuenta.miembro.nombre, `${S.data.parroquia} · ${S.data.anio}`) + vistaAreas(); montarAreas(); return; }
     m.innerHTML = S.mtab==="asistencia" ? vistaMiAsistencia() : S.mtab==="ficha" ? vistaMiFicha() : vistaMiembro(); montarMiembro(); return; }
   const tabs = [["inicio","Inicio","home"],["dirigentes","Dirigentes","users"],["cobrar","Cobrar","cash"]];
   if(S.gastos || S.kiosco) tabs.push(["caja","Caja","receipt"]);
@@ -475,9 +475,9 @@ function render(){
 function renderYo(){
   const m = $("vMain");
   S.data = S.yo.data; S.codigo = S.yo.codigo; S.asis = S.yo.asis; S.ficha = S.yo.ficha;
-  const v = ["aportes","asistencia","ficha"].concat(S.org?["areas"]:[]).includes(S.mtab) ? S.mtab : "aportes";
+  const v = ["aportes","asistencia","ficha"].concat(conAreas()?["areas"]:[]).includes(S.mtab) ? S.mtab : "aportes";
   const html = v==="areas" ? cabecera(S.data.cuenta.miembro.nombre, `${S.data.parroquia} · ${S.data.anio}`) + vistaAreas() : v==="asistencia" ? vistaMiAsistencia() : v==="ficha" ? vistaMiFicha() : vistaMiembro();
-  const barra = `<div class="filters" style="margin:-4px 0 4px">${[["aportes","Mis aportes"],["asistencia","Mi asistencia"],["ficha","Mi ficha"]].concat(S.org?[["areas","Áreas"]]:[]).map(([id,t])=>`<button data-ytab="${id}" aria-pressed="${v===id}">${t}</button>`).join("")}</div>
+  const barra = `<div class="filters" style="margin:-4px 0 4px">${[["aportes","Mis aportes"],["asistencia","Mi asistencia"],["ficha","Mi ficha"]].concat(conAreas()?[["areas","Áreas"]]:[]).map(([id,t])=>`<button data-ytab="${id}" aria-pressed="${v===id}">${t}</button>`).join("")}</div>
     <button class="btn soft block sm" data-volver-staff style="margin-bottom:4px">${I("home","sm")} Volver a la tesorería</button>`;
   m.innerHTML = html;
   const head = m.querySelector(".head"); if(head) head.insertAdjacentHTML("afterend", barra); else m.insertAdjacentHTML("afterbegin", barra);
@@ -488,7 +488,7 @@ function renderYo(){
 function renderAutoridad(){
   const m = $("vMain");
   const tabs = [["asistencia","Asistencia","check"],["fichas","Fichas","users"]];
-  if(S.org) tabs.push(["areas","Áreas","org"]);
+  if(conAreas()) tabs.push(["areas","Áreas","org"]);
   if(S.yo) tabs.push(["yo_aportes","Mis aportes","heart"],["yo_asis","Mi asistencia","clock"],["yo_ficha","Mi ficha","award"]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab = "asistencia";
   $("tabsIn").innerHTML = tabs.map(([id,t,ic])=>`<button class="tab" data-tab="${id}" ${S.tab===id?'aria-current="page"':""} style="font-size:${tabs.length>3?".7rem":".78rem"}">${I(ic)}<span>${t}</span></button>`).join("");
@@ -633,6 +633,8 @@ async function guardarQR(texto, nombre){
   }catch(e){ toast("No se pudo guardar. Sacale una captura de pantalla al QR."); }
 }
 // ===== Organigrama y áreas =====
+// La pestaña de áreas solo la ve quien tiene gente a cargo (guías de área, responsables y guía de caravana)
+const conAreas = () => !!(S.org && S.org.mis_areas && S.org.mis_areas.length);
 function vistaAreas(){
   const o = S.org; if(!o) return `<div class="card">No se pudo cargar el organigrama.</div>`;
   const mias = [];
@@ -2021,7 +2023,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611122353";
+const APP_VERSION = "202611122102";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
