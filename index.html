@@ -588,6 +588,10 @@ function conceptosHTML(cs){
       <div class="num ${r.saldo>0?"debt":"paid"}">${r.saldo>0?fmt(r.saldo):(r.a_favor>0?`+${fmt(r.a_favor)}`:I("check"))}</div></div>`}).join("");
 }
 function pillEstado(e){return e==="verificado"?`<span class="pill ok">${I("check","sm")}Verificado</span>`:e==="pendiente"?`<span class="pill warn">${I("clock","sm")}En revisión</span>`:`<span class="pill bad">${I("x","sm")}Rechazado</span>`}
+function mesAct(){
+  const d = S.data || {}; const m = d.cuenta?.aporte?.mes_actual || (d.miembros||[]).find(x=>x.aporte?.mes_actual)?.aporte?.mes_actual;
+  return m || new Date().toLocaleString("es-AR",{month:"long", timeZone:"America/Argentina/Buenos_Aires"});
+}
 function pagosHTML(ps, reenviar){
   return ps.length ? ps.map(p=>`
     <div class="item"><div class="ic ${p.estado==="verificado"?"ok":p.estado==="pendiente"?"sun":"bad"}">${I(p.medio==="Efectivo"?"cash":"file")}</div>
@@ -609,7 +613,7 @@ function vistaMiembro(){
   return `${cabecera(m.nombre, `${d.parroquia} · ${d.anio}`)}
   ${S.asis?alertaRacha(S.asis.racha, true):""}
   <div class="hero ${c.saldo>0?"deuda":""}">
-    <div class="lbl">Deuda acumulada</div>
+    <div class="lbl">Deuda acumulada hasta ${esc(mesAct())}</div>
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
     ${desgloseHTML(c.conceptos, "", c.aporte, true)}
@@ -765,7 +769,7 @@ function areaDetHTML(d){
       <div class="stat"><span class="muted tiny">Con deuda</span><b class="${conDeuda?"debt":"paid"}">${conDeuda}</b></div>
       <div class="stat"><span class="muted tiny">Asistencia prom.</span><b>${prom==null?"—":prom+"%"}</b></div>
     </div>
-    ${deuda>0?`<div class="estado bad">${I("alert")}<span>Deuda acumulada del área: ${fmt(deuda)}</span></div>`:`<div class="estado ok">${I("check")}<span>Todo el área está al día con los aportes.</span></div>`}
+    ${deuda>0?`<div class="estado bad">${I("alert")}<span>Deuda acumulada del área hasta ${esc(mesAct())}: ${fmt(deuda)}</span></div>`:`<div class="estado ok">${I("check")}<span>Todo el área está al día con los aportes.</span></div>`}
     <div class="muted tiny">Tocá un nombre para ver el detalle.</div>
     <div class="list">${is.map(x=>{ const p = pct(x);
       return `<div class="ar-row" data-ar="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
@@ -935,7 +939,7 @@ function tabDirigentes(){
         <div class="avatar sm">${esc(ini(m.nombre))}</div>
         <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(m.nombre)} ${pill}</div>
           <div class="muted small">${fmt(a.mensual)}/mes · falta ${fmt(a.falta_anio)} del año${d.tipo==="guia"?` · ${m.tesorero?esc(m.tesorero):"sin tesorero"}`:""}</div></div>
-        <div style="text-align:right"><div class="muted tiny">Deuda acumulada</div><div class="num ${m.saldo>0?"debt":"paid"}">${m.saldo>0?fmt(m.saldo):"Nada"}</div></div>
+        <div style="text-align:right"><div class="muted tiny">Deuda hasta ${esc(mesAct())}</div><div class="num ${m.saldo>0?"debt":"paid"}">${m.saldo>0?fmt(m.saldo):"Nada"}</div></div>
         <span class="chev">${I("chev")}</span></button><div class="det" data-det="${m.id}" hidden></div></div>`}).join("")
       : `<div class="empty"><div class="ic">${I("search")}</div>No hay dirigentes con ese filtro.</div>`}</div></div>`;
 }
@@ -2178,7 +2182,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611162329";
+const APP_VERSION = "202611162353";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
