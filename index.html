@@ -105,6 +105,7 @@ button,input,select{font:inherit;color:inherit}
 .rp-f .l{flex:1;min-width:0}.rp-f .t{font-weight:800}
 .rp-f input{width:120px;flex:none;text-align:right}
 .rp-tot{display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem;padding:4px 2px}
+.efe-btn{background:#FFF4D6;color:#7A4A00;border:0;margin-top:8px}
 .efe{display:flex;gap:8px;align-items:flex-start;background:#FFF4D6;color:#5A3D00;border-radius:12px;padding:10px 12px;font-size:.88rem;line-height:1.35}
 .efe .ico{flex:none;margin-top:2px}
 .hero.deuda{background:linear-gradient(140deg,#D64545 0%,#9C2727 100%);box-shadow:0 10px 24px rgba(194,59,59,.3)}
@@ -388,7 +389,7 @@ async function entrar(cod){
 }
 async function recargar(){
   if(S.staff) S.codigo = S.staff.codigo;
-  if(S.staff && S.staff.data.tipo!=="autoridad") S.rend = await rpc("rendiciones",{p_codigo:S.codigo}).catch(()=>S.rend);
+  if(S.staff && S.staff.data.tipo!=="autoridad") [S.rend, S.avisos] = await Promise.all([rpc("rendiciones",{p_codigo:S.codigo}).catch(()=>S.rend), rpc("avisos_efectivo",{p_codigo:S.codigo}).catch(()=>S.avisos)]);
   S.data = await rpc("entrar", {p_codigo:S.codigo}); S.fichasGuia = null;
   await cargarExtras();
   render();
@@ -410,7 +411,7 @@ async function cargarExtras(){
     return;
   }
   S.aut = null; S.staff = {data:S.data, codigo:S.codigo}; S.yo = null;
-  const tareas = [rpc("rendiciones",{p_codigo:S.codigo}).then(r=>S.rend=r).catch(()=>S.rend=null), rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
+  const tareas = [rpc("rendiciones",{p_codigo:S.codigo}).then(r=>S.rend=r).catch(()=>S.rend=null), rpc("avisos_efectivo",{p_codigo:S.codigo}).then(r=>S.avisos=r).catch(()=>S.avisos=null), rpc("kiosco_panel",{p_codigo:S.codigo}).then(r=>S.kiosco=r).catch(()=>S.kiosco=null),
     rpc("reuniones_lista",{p_codigo:S.codigo}).then(r=>S.reus=r).catch(()=>S.reus=null), rpc("gastos_lista",{p_codigo:S.codigo}).then(r=>{S.gastos=r.gastos; S.puedeGastar=!!r.puede_cargar}).catch(()=>{S.gastos=null; S.puedeGastar=false})];
   if(S.data.yo_codigo){ const yc = S.data.yo_codigo;
     tareas.push(Promise.all([rpc("entrar",{p_codigo:yc}), rpc("mi_asistencia",{p_codigo:yc}).catch(()=>null), rpc("mi_ficha",{p_codigo:yc}).catch(()=>null)])
@@ -595,7 +596,8 @@ function pagosHTML(ps, reenviar){
       ${p.pct_aporte>0?`<span class="pill neutral">${I("heart","sm")} ${fmt(p.monto*p.pct_aporte/100)} al aporte</span>`:""}
       ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}
       ${!reenviar&&p.estado==="verificado"&&p.recibo_nro?`<button class="btn ghost sm" data-mi-recibo="${p.id}">${I("file","sm")} Ver recibo</button>`:""}
-      ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?"Efectivo que le diste a tu tesorero: todavía no lo rindió. El recibo te llega cuando lo entregue a tesorería.":"Esperando que tesorería verifique el comprobante."}</div>`:""}</div>
+      ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?(p.sin_confirmar?"Avisaste que le diste este efectivo a tu tesorero. Falta que lo confirme.":"Tu tesorero ya lo registró, pero todavía no lo rindió. El recibo te llega cuando lo entregue a tesorería."):"Esperando que tesorería verifique el comprobante."}</div>`:""}
+      ${!reenviar&&p.estado==="verificado"&&p.rendido?`<div class="tiny paid">${I("check","sm")} Tu tesorero ya entregó este efectivo a tesorería el ${esc(p.rendido)}.</div>`:""}</div>
       <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end"><div class="num" style="font-weight:800">${fmt(p.monto)}</div>${pillEstado(p.estado)}</div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no hay pagos registrados.</div>`;
 }
@@ -611,11 +613,14 @@ function vistaMiembro(){
     <div class="big num">${fmt(c.saldo)}</div>
     ${chip}
     ${desgloseHTML(c.conceptos, "", c.aporte, true)}
-    ${(()=>{ const pe = (c.pagos||[]).filter(p=>p.estado==="pendiente"&&p.medio==="Efectivo").reduce((t,p)=>t+Number(p.monto),0), pt = Math.max(0, Number(c.pendiente)-pe);
+    ${(()=>{ const ef = (c.pagos||[]).filter(p=>p.estado==="pendiente"&&p.medio==="Efectivo");
+      const pa = ef.filter(p=>p.sin_confirmar).reduce((t,p)=>t+Number(p.monto),0), pe = ef.filter(p=>!p.sin_confirmar).reduce((t,p)=>t+Number(p.monto),0), pt = Math.max(0, Number(c.pendiente)-pe-pa);
       const tes = d.tesorero ? primer(d.tesorero.nombre) : "tu tesorero";
       return (pe>0?`<div class="efe">${I("cash","sm")}<span><b>Le diste ${fmt(pe)} en efectivo a ${esc(tes)}.</b> Ya está registrado: no hace falta que informes el pago. Se te descuenta cuando ${esc(tes)} lo entregue a tesorería.</span></div>`:"")
+        + (pa>0?`<div class="efe">${I("clock","sm")}<span><b>Avisaste que le diste ${fmt(pa)} en efectivo a ${esc(tes)}.</b> Falta que ${esc(tes)} lo confirme en la app.</span></div>`:"")
         + (pt>0?`<div class="small" style="opacity:.9">Tenés ${fmt(pt)} en comprobantes de transferencia esperando que tesorería los verifique.</div>`:""); })()}
     <button class="btn block" data-pagar>${I("upload")} Informar un pago</button>
+    <button class="btn block efe-btn" data-efectivo>${I("cash")} Pagué en efectivo a mi tesorero</button>
   </div>
   <div class="card"><h2>${I("heart")} Mi aporte anual</h2>${aporteHTML(c.aporte, true)}</div>
   <div class="card"><h2>${I("tag")} Lo que debo por concepto</h2><div class="list">${conceptosHTML(c.conceptos)}</div></div>
@@ -670,7 +675,25 @@ function rendicionHTML(){
     <button class="btn soft sm" data-tabgo="cobrar">${I("cash","sm")} Cobrar efectivo</button>
     ${hist}</div>`;
 }
+function avisosHTML(){
+  const a = S.avisos || []; if(!a.length) return "";
+  const todos = S.data.tipo==="guia" || (S.rend && S.rend.recibe);
+  return `<div class="card aviso-ef"><div class="row"><h2>${I("cash")} Avisos de pago en efectivo</h2><span class="pill warn">${a.length}</span></div>
+    <div class="muted small">Estos dirigentes avisaron que te dieron efectivo. Confirmá solo si de verdad lo recibiste.</div>
+    ${a.map(x=>`<div class="rend">
+      <div class="row"><div><div class="t" style="font-weight:800">${esc(x.miembro)}</div>
+        <div class="muted tiny">${esc(x.fecha)} · ${x.detalle.map(d=>`${esc(d.concepto)} ${fmt(d.monto)}`).join(" + ")}${todos&&x.tesorero?` · tesorero: ${esc(primer(x.tesorero))}`:""}</div></div>
+        <div class="num" style="font-size:1.1rem;font-weight:800">${fmt(x.monto)}</div></div>
+      <div class="actions" style="margin-top:8px"><button class="btn soft sm" data-aviso-no="${x.id}" data-aviso-nom="${esc(x.miembro)}">${I("x","sm")} No lo recibí</button>
+        <button class="btn ok sm" data-aviso-ok="${x.id}" data-aviso-nom="${esc(x.miembro)}" data-aviso-monto="${x.monto}">${I("check","sm")} Sí, me lo dio</button></div></div>`).join("")}</div>`;
+}
 function montarRendicion(){
+  $("vMain").querySelectorAll("[data-aviso-ok],[data-aviso-no]").forEach(b=> b.onclick = async ()=>{
+    const ok = !!b.dataset.avisoOk, id = Number(b.dataset.avisoOk||b.dataset.avisoNo), nom = b.dataset.avisoNom;
+    if(!ok && !(await confirmar("Rechazar aviso", `¿Confirmás que <b>${esc(nom)}</b> no te dio ese efectivo? El aviso se borra de su cuenta como rechazado.`, "Sí, no lo recibí", "bad"))) return;
+    ocupado(b, async ()=>{ try{ const r = await rpc("confirmar_efectivo",{p_codigo:S.codigo, p_pago:id, p_ok:ok});
+      await recargar(); if(ok) hojaRecibo(r); else toast("Aviso rechazado"); }catch(er){ toast(er.message) } });
+  });
   $("vMain").querySelectorAll("[data-recibir]").forEach(b=> b.onclick = async ()=>{
     const nom = b.dataset.recibirNom, tot = Number(b.dataset.recibirTotal);
     if(!(await confirmar("Recibir efectivo", `¿Confirmás que <b>${esc(nom)}</b> te entregó <b>${fmt(tot)}</b> en efectivo?`, "Sí, lo recibí", "ok"))) return;
@@ -776,6 +799,7 @@ function montarMiembro(){
   const gq = $("vMain").querySelector("[data-guardar-qr]"); if(gq) gq.onclick = ()=> ocupado(gq, ()=>guardarQR(S.asis.qr, S.data.cuenta.miembro.nombre));
   $("vMain").querySelector("[data-salir]").onclick = salir;
   const pg = $("vMain").querySelector("[data-pagar]"); if(pg) pg.onclick = hojaPago;
+  const pe = $("vMain").querySelector("[data-efectivo]"); if(pe) pe.onclick = hojaEfectivo;
   $("vMain").querySelectorAll("[data-mi-recibo]").forEach(b=> b.onclick = ()=> ocupado(b, async ()=>{
     try{ hojaMiRecibo(await rpc("mi_recibo",{p_codigo:S.codigo, p_pago:Number(b.dataset.miRecibo)})); }catch(er){ toast(er.message) } }));
   const mm = $("miMailOk"); if(mm) mm.onclick = ()=> ocupado(mm, async ()=>{
@@ -791,6 +815,31 @@ function hojaMiRecibo(r){
     <button class="btn ghost" data-cerrar>Cerrar</button>`,
   (s)=>{ s.querySelector("[data-copiar]").onclick = async ()=>{ try{await navigator.clipboard.writeText(txt);toast("Recibo copiado")}catch(_){toast("No se pudo copiar")} };
     const sh = s.querySelector("[data-compartir]"); if(sh) sh.onclick = async ()=>{ try{ await navigator.share({text:txt, title:`Recibo N° ${r.recibo_nro}`}); }catch(_){} }; });
+}
+function hojaEfectivo(){
+  const ev = S.data.eventos || [], cs = S.data.cuenta.conceptos || [];
+  const tes = S.data.tesorero ? primer(S.data.tesorero.nombre) : "tu tesorero";
+  const saldoDe = id => { const c = cs.find(x=> (x.evento_id ?? null) === id); return c ? Number(c.saldo)||0 : 0; };
+  const filas = [{id:null, nombre:"Aportes", saldo:saldoDe(null)}].concat(ev.map(e=>({id:e.id, nombre:e.nombre, saldo:saldoDe(e.id)})));
+  abrirHoja(`<h2>${I("cash")} Pagué en efectivo</h2>
+    <div class="muted small">Escribí cuánto le diste a <b>${esc(tes)}</b> para cada cosa. Le llega un aviso y, cuando lo confirme, el pago queda registrado. El recibo oficial te llega cuando lo entregue a tesorería.</div>
+    <div class="rp">${filas.map((f,i)=>`<div class="rp-f"><div class="l"><div class="t">${esc(f.nombre)}</div>
+        <div class="tiny ${f.saldo>0?"debt":"muted"}">${f.saldo>0?`Debés ${fmt(f.saldo)}`:"No debés nada"}</div></div>
+        <input data-ef2="${i}" type="number" inputmode="numeric" min="0" placeholder="$ 0" aria-label="Monto para ${esc(f.nombre)}"></div>`).join("")}</div>
+    <div class="rp-tot"><span>Total que le diste</span><span class="num" id="efTotal">${fmt(0)}</span></div>
+    <div class="err" id="efErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="efEnviar">${I("send")} Avisar a ${esc(tes)}</button></div>`,
+  (s, cerrar)=>{
+    const ins = [...s.querySelectorAll("[data-ef2]")];
+    const partes = () => ins.map(x=>({evento_id:filas[Number(x.dataset.ef2)].id, monto:Math.round(Number(x.value)||0)})).filter(x=>x.monto>0);
+    ins.forEach(x=> x.addEventListener("input", ()=>{ s.querySelector("#efTotal").textContent = fmt(partes().reduce((t,x)=>t+x.monto,0)); }));
+    const btn = s.querySelector("#efEnviar"), err = s.querySelector("#efErr");
+    btn.onclick = () => ocupado(btn, async ()=>{ err.hidden = true;
+      try{ const ps = partes(); if(!ps.length) throw new Error("Escribí cuánto le diste en al menos un concepto.");
+        const r = await rpc("informar_efectivo",{p_codigo:S.codigo, p_reparto:ps});
+        cerrar(); await recargar(); toast(`Listo. ${primer(r.tesorero||tes)} tiene que confirmarlo.`);
+      }catch(e){ err.textContent = e.message; err.hidden = false; } });
+  });
 }
 function hojaPago(){
   const ev = S.data.eventos || [], cs = S.data.cuenta.conceptos || [];
@@ -844,8 +893,8 @@ function tabInicio(){
   const total = d.miembros.reduce((s,m)=>s+Number(m.saldo),0);
   const atr = d.miembros.filter(m=>!m.aporte.al_dia).length;
   const pend = d.pendientes;
-  if(!d.miembros.length && S.rend) return `${alertasHTML()}${rendicionHTML()}`; // quien solo recibe rendiciones
-  return `${alertasHTML()}
+  if(!d.miembros.length && S.rend) return `${alertasHTML()}${avisosHTML()}${rendicionHTML()}`; // quien solo recibe rendiciones
+  return `${alertasHTML()}${avisosHTML()}
   ${S.rend && S.rend.recibe ? rendicionHTML() : ""}
   <div class="hero">
     <div class="lbl">${d.tipo==="guia"?"Deuda de todos los dirigentes hoy":"Deuda de tus dirigentes hoy"}</div>
@@ -2129,7 +2178,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611122209";
+const APP_VERSION = "202611162329";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
