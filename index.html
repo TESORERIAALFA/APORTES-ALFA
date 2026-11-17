@@ -1493,7 +1493,7 @@ function alertasHTML(){
   const mc = miCelularHTML();
   const al = S.reus?.alertas || [];
   if(!al.length) return mc;
-  return mc + `<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">${I("alert")} ${al.length===1?"1 dirigente con 3 o más faltas seguidas":al.length+" dirigentes con 3 o más faltas seguidas"}</h2>
+  return mc + `<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">${I("alert")} ${al.length===1?"1 dirigente con 2 o más faltas seguidas":al.length+" dirigentes con 2 o más faltas seguidas"}</h2>
     <div class="list">${al.map(x=>`<button class="mem" data-hist="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
       <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(x.nombre)}</div><div class="muted small">${x.racha} faltas seguidas · tocá para ver el detalle</div></div>
       <span class="pill bad">${x.racha}</span></button>`).join("")}</div></div>`;
@@ -2194,7 +2194,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611170009";
+const APP_VERSION = "202611170900";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
