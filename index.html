@@ -306,6 +306,8 @@ function telWA(t){
   else if(d.startsWith("54") && !d.startsWith("549")) d = "549"+d.slice(2);
   return d;
 }
+function telVer(t){ let d = String(t||"").replace(/\D/g,""); if(d.startsWith("549")) d = d.slice(3); else if(d.startsWith("54")) d = d.slice(2);
+  return d.length===10 ? `${d.slice(0,3)} ${d.slice(3,6)}-${d.slice(6)}` : d; }
 const waLink = (tel, txt) => `https://wa.me/${telWA(tel)}?text=${encodeURIComponent(txt)}`;
 const linkPersonal = cod => location.origin + location.pathname + "?c=" + encodeURIComponent(cod);
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -634,8 +636,9 @@ function vistaMiembro(){
     <button class="btn" id="miMailOk">${I("check","sm")} Guardar</button></div></div>`}
   <div class="card"><h2>${I("clock")} Mis pagos</h2><div class="list">${pagosHTML(c.pagos)}</div>${c.miembro.email?`<div class="muted tiny">Los recibos te llegan a ${esc(c.miembro.email)}.</div>`:""}</div>
   ${d.tesorero?`<div class="card"><div class="item" style="padding:0"><div class="avatar sm">${esc(ini(d.tesorero.nombre))}</div>
-    <div class="l"><div class="muted tiny">Tu tesorero</div><div class="t">${esc(d.tesorero.nombre)}</div></div>
-    <a class="btn wa sm" target="_blank" rel="noopener" href="${waLink(d.tesorero.celular, `Hola ${primer(d.tesorero.nombre)}, soy ${m.nombre}. `)}">${I("msg","sm")} Escribirle</a></div></div>`:""}`;
+    <div class="l"><div class="muted tiny">Tu tesorero</div><div class="t">${esc(d.tesorero.nombre)}</div>
+      <div class="small ${d.tesorero.celular?"":"muted"}">${d.tesorero.celular?`${I("msg","sm")} ${esc(telVer(d.tesorero.celular))}`:"Todavía no cargó su número"}</div></div>
+    ${d.tesorero.celular?`<a class="btn wa sm" target="_blank" rel="noopener" href="${waLink(d.tesorero.celular, `Hola ${primer(d.tesorero.nombre)}, soy ${m.nombre}. `)}">${I("msg","sm")} Escribirle</a>`:""}</div></div>`:""}`;
 }
 async function guardarQR(texto, nombre){
   try{
@@ -692,6 +695,7 @@ function avisosHTML(){
         <button class="btn ok sm" data-aviso-ok="${x.id}" data-aviso-nom="${esc(x.miembro)}" data-aviso-monto="${x.monto}">${I("check","sm")} Sí, me lo dio</button></div></div>`).join("")}</div>`;
 }
 function montarRendicion(){
+  const mc = $("miCelOk"); if(mc) mc.onclick = ()=> ocupado(mc, async ()=>{ try{ await rpc("set_mi_celular",{p_codigo:S.codigo, p_celular:$("miCel").value}); await recargar(); toast("¡Listo! Tus dirigentes ya ven tu número."); }catch(e){ toast(e.message) } });
   $("vMain").querySelectorAll("[data-aviso-ok],[data-aviso-no]").forEach(b=> b.onclick = async ()=>{
     const ok = !!b.dataset.avisoOk, id = Number(b.dataset.avisoOk||b.dataset.avisoNo), nom = b.dataset.avisoNom;
     if(!ok && !(await confirmar("Rechazar aviso", `¿Confirmás que <b>${esc(nom)}</b> no te dio ese efectivo? El aviso se borra de su cuenta como rechazado.`, "Sí, no lo recibí", "bad"))) return;
@@ -1478,10 +1482,18 @@ function tabAsistencia(){
         <span class="small num"><b class="${x.pc<60?"debt":x.pc<80?"":"paid"}">${x.pc}%</b> <span class="muted">· ${x.ausentes} falta${x.ausentes===1?"":"s"}</span></span></div>
       <div class="prog"><span style="width:${x.pc}%;${x.pc<60?"background:var(--bad)":x.pc<80?"background:var(--sun)":""}"></span></div></button>`).join("")}</div></div>`:""}`;
 }
+function miCelularHTML(){
+  const t = S.data?.tesorero; if(!t || t.celular || S.data.tipo==="autoridad") return "";
+  return `<div class="card" style="border:2px solid #F2B544"><h2>${I("msg")} Cargá tu celular</h2>
+    <div class="muted small">Así tus dirigentes ven tu número y te pueden escribir por WhatsApp desde la app.</div>
+    <div class="grid2" style="grid-template-columns:1fr auto;align-items:end"><label>Tu celular<input id="miCel" inputmode="tel" autocomplete="tel" placeholder="381 555 0101"></label>
+    <button class="btn" id="miCelOk">${I("check","sm")} Guardar</button></div></div>`;
+}
 function alertasHTML(){
+  const mc = miCelularHTML();
   const al = S.reus?.alertas || [];
-  if(!al.length) return "";
-  return `<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">${I("alert")} ${al.length===1?"1 dirigente con 3 o más faltas seguidas":al.length+" dirigentes con 3 o más faltas seguidas"}</h2>
+  if(!al.length) return mc;
+  return mc + `<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">${I("alert")} ${al.length===1?"1 dirigente con 3 o más faltas seguidas":al.length+" dirigentes con 3 o más faltas seguidas"}</h2>
     <div class="list">${al.map(x=>`<button class="mem" data-hist="${x.id}"><div class="avatar sm">${esc(ini(x.nombre))}</div>
       <div class="l" style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(x.nombre)}</div><div class="muted small">${x.racha} faltas seguidas · tocá para ver el detalle</div></div>
       <span class="pill bad">${x.racha}</span></button>`).join("")}</div></div>`;
@@ -2182,7 +2194,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611162353";
+const APP_VERSION = "202611170009";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
