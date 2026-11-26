@@ -195,6 +195,9 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 /* Pestañas abajo */
 .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:15}
 .tabs .in{display:flex;max-width:600px;width:100%}
+.seg{display:flex;gap:6px;background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:4px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:10px 6px;font-weight:700;color:var(--muted,inherit);display:flex;gap:6px;align-items:center;justify-content:center;cursor:pointer;font-size:.9rem}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .tab{flex:1;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 1px;font-size:.66rem;font-weight:800;color:var(--muted);cursor:pointer;border-radius:12px;position:relative}
 .tab[aria-current="page"]{color:var(--brand);background:var(--brand-soft)}
 .tab .badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:999px;font-size:.65rem;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px}
@@ -603,6 +606,7 @@ function pagosHTML(ps, reenviar){
       ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}
       ${!reenviar&&p.estado==="verificado"&&p.recibo_nro?`<button class="btn ghost sm" data-mi-recibo="${p.id}">${I("file","sm")} Ver recibo</button>`:""}
       ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?(p.sin_confirmar?"Avisaste que le diste este efectivo a tu tesorero. Falta que lo confirme.":"Tu tesorero ya lo registró, pero todavía no lo rindió. El recibo te llega cuando lo entregue a tesorería."):"Esperando que tesorería verifique el comprobante."}</div>`:""}
+      ${!reenviar&&p.editable?`<button class="btn ghost sm" data-editar-pago="${p.id}">${I("edit","sm")} Corregir o borrar</button>`:""}
       ${!reenviar&&p.estado==="verificado"&&p.rendido?`<div class="tiny paid">${I("check","sm")} Tu tesorero ya entregó este efectivo a tesorería el ${esc(p.rendido)}.</div>`:""}</div>
       <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end"><div class="num" style="font-weight:800">${fmt(p.monto)}</div>${pillEstado(p.estado)}</div></div>`).join("")
     : `<div class="empty"><div class="ic">${I("clock")}</div>Todavía no hay pagos registrados.</div>`;
@@ -808,6 +812,7 @@ function montarMiembro(){
   $("vMain").querySelector("[data-salir]").onclick = salir;
   const pg = $("vMain").querySelector("[data-pagar]"); if(pg) pg.onclick = hojaPago;
   const pe = $("vMain").querySelector("[data-efectivo]"); if(pe) pe.onclick = hojaEfectivo;
+  $("vMain").querySelectorAll("[data-editar-pago]").forEach(b=> b.onclick = ()=> hojaEditarPago(Number(b.dataset.editarPago)));
   $("vMain").querySelectorAll("[data-mi-recibo]").forEach(b=> b.onclick = ()=> ocupado(b, async ()=>{
     try{ hojaMiRecibo(await rpc("mi_recibo",{p_codigo:S.codigo, p_pago:Number(b.dataset.miRecibo)})); }catch(er){ toast(er.message) } }));
   const mm = $("miMailOk"); if(mm) mm.onclick = ()=> ocupado(mm, async ()=>{
@@ -847,6 +852,60 @@ function hojaEfectivo(){
         const r = await rpc("informar_efectivo",{p_codigo:S.codigo, p_reparto:ps});
         cerrar(); await recargar(); toast(`Listo. ${primer(r.tesorero||tes)} tiene que confirmarlo.`);
       }catch(e){ err.textContent = e.message; err.hidden = false; } });
+  });
+}
+// Corregir o borrar un pago que el dirigente informó y que todavía nadie revisó
+function hojaEditarPago(id){
+  const todos = S.data.cuenta.pagos || [], p0 = todos.find(x=>x.id===id); if(!p0) return;
+  const grupo = p0.grupo ? todos.filter(x=>x.grupo===p0.grupo && x.editable) : [p0];
+  const ev = S.data.eventos || [];
+  const filas = [{id:null, nombre:"Aportes"}].concat(ev.map(e=>({id:e.id, nombre:e.nombre})));
+  grupo.forEach(g=>{ if(g.evento_id!==null && !filas.some(f=>f.id===g.evento_id)) filas.push({id:g.evento_id, nombre:g.concepto}); });
+  const montoDe = fid => { const g = grupo.find(x=>(x.evento_id ?? null)===fid); return g ? Math.round(Number(g.monto)) : ""; };
+  let medio = p0.medio==="Efectivo" ? "Efectivo" : "Transferencia";
+  const tieneComp = grupo.some(g=>g.tiene_comprobante);
+  const tes = S.data.tesorero ? primer(S.data.tesorero.nombre) : "tu tesorero";
+  abrirHoja(`<h2>${I("edit")} Corregir pago</h2>
+    <div class="muted small">Todavía nadie lo revisó, así que lo podés corregir o borrar.</div>
+    <div class="seg" id="eMedio"><button type="button" data-m="Transferencia">${I("file","sm")} Transferencia</button><button type="button" data-m="Efectivo">${I("cash","sm")} Efectivo a ${esc(tes)}</button></div>
+    <div class="rp">${filas.map((f,i)=>`<div class="rp-f"><div class="l"><div class="t">${esc(f.nombre)}</div></div>
+        <input data-ed="${i}" type="number" inputmode="numeric" min="0" placeholder="$ 0" value="${montoDe(f.id)}" aria-label="Monto para ${esc(f.nombre)}"></div>`).join("")}</div>
+    <div class="rp-tot"><span>Total</span><span class="num" id="eTotal"></span></div>
+    <div id="eComp"><label class="file" id="eFileBox">${I("upload")}<span id="eFileTxt"></span>
+      <input id="eArchivo" type="file" accept="image/*,application/pdf"></label></div>
+    <label class="small muted" for="eObs">Observación (opcional)</label>
+    <textarea id="eObs" rows="2" maxlength="200">${esc(p0.observacion||"")}</textarea>
+    <div class="err" id="eErr" hidden></div>
+    <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="eGuardar">${I("check")} Guardar cambios</button></div>
+    <button class="btn ghost" id="eBorrar" style="color:var(--bad)">${I("x","sm")} Borrar este pago</button>`,
+  (s, cerrar)=>{
+    const ins = [...s.querySelectorAll("[data-ed]")], inp = s.querySelector("#eArchivo"), err = s.querySelector("#eErr");
+    const partes = () => ins.map(x=>({evento_id:filas[Number(x.dataset.ed)].id, monto:Math.round(Number(x.value)||0)})).filter(x=>x.monto>0);
+    const upd = () => { s.querySelector("#eTotal").textContent = fmt(partes().reduce((t,x)=>t+x.monto,0)); };
+    const txtArch = () => { const f = inp.files[0]; s.querySelector("#eFileBox").classList.toggle("has", !!f);
+      s.querySelector("#eFileTxt").innerHTML = f ? `<b>${esc(f.name)}</b><br><span class="small">Tocá para cambiarlo</span>`
+        : tieneComp ? `<b>Se mantiene el comprobante que subiste</b><br><span class="small">Tocá si querés cambiarlo</span>` : `<b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span>`; };
+    const setMedio = m => { medio = m; s.querySelectorAll("#eMedio [data-m]").forEach(b=>b.classList.toggle("on", b.dataset.m===m)); s.querySelector("#eComp").hidden = m!=="Transferencia"; };
+    s.querySelectorAll("#eMedio [data-m]").forEach(b=> b.onclick = ()=> setMedio(b.dataset.m));
+    ins.forEach(x=> x.addEventListener("input", upd)); inp.onchange = txtArch;
+    setMedio(medio); upd(); txtArch();
+    const enviar = async fd => { fd.append("codigo", S.codigo); await fnComprobantes(fd); cerrar(); await recargar(); };
+    const g = s.querySelector("#eGuardar");
+    g.onclick = () => ocupado(g, async ()=>{ err.hidden = true;
+      try{ const ps = partes(); if(!ps.length) throw new Error("Escribí el monto en al menos un concepto.");
+        const fd = new FormData(); fd.append("editar", String(id)); fd.append("medio", medio);
+        if(ps.length===1){ fd.append("monto", String(ps[0].monto)); fd.append("evento_id", ps[0].evento_id===null?"":String(ps[0].evento_id)); }
+        else fd.append("reparto", JSON.stringify(ps));
+        const obs = s.querySelector("#eObs").value.trim(); if(obs) fd.append("observacion", obs);
+        if(medio==="Transferencia"){ let f = inp.files[0];
+          if(f){ f = await comprimir(f); if(f.size > 10*1024*1024) throw new Error("El archivo pesa más de 10 MB."); fd.append("archivo", f); }
+          else if(!tieneComp) throw new Error("Elegí la foto o el PDF del comprobante."); }
+        await enviar(fd); toast("Listo, el pago quedó corregido.");
+      }catch(e){ err.textContent = e.message; err.hidden = false; } });
+    const bo = s.querySelector("#eBorrar");
+    bo.onclick = async ()=>{ if(!await confirmar("¿Borrar este pago?", "Se borra el aviso y, si tenía, el comprobante. Si después pagás, lo informás de nuevo.", "Borrar")) return;
+      ocupado(bo, async ()=>{ try{ const fd = new FormData(); fd.append("borrar", String(id)); await enviar(fd); toast("Pago borrado."); }
+        catch(e){ err.textContent = e.message; err.hidden = false; } }); };
   });
 }
 function hojaPago(){
@@ -2198,7 +2257,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611252229";
+const APP_VERSION = "202611252313";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
