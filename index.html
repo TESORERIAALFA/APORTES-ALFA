@@ -37,7 +37,7 @@
 html{padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
 [hidden]{display:none!important}
-button,input,select{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
 .wrap{max-width:600px;margin:0 auto;padding-block:12px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
 .ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ico.sm{width:16px;height:16px}
@@ -128,7 +128,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* Formularios */
 label{display:flex;flex-direction:column;gap:6px;font-size:.88rem;color:var(--muted);font-weight:700}
-input,select{background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px;width:100%;font-size:1rem;color:var(--ink)}
+input,select,textarea{background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px;width:100%;font-size:1rem;color:var(--ink)}
 input:focus,select:focus{border-color:var(--brand);outline:none}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:440px){.grid2{grid-template-columns:1fr}}
@@ -863,6 +863,8 @@ function hojaPago(){
     <div class="rp-tot"><span>Total transferido</span><span class="num" id="pTotal">${fmt(0)}</span></div>
     <label class="file" id="pFileBox">${I("upload")}<span id="pFileTxt"><b>Tocá para elegir el comprobante</b><br><span class="small">Foto o PDF</span></span>
       <input id="pArchivo" type="file" accept="image/*,application/pdf"></label>
+    <label class="small muted" for="pObs">Observación (opcional)</label>
+    <textarea id="pObs" rows="2" maxlength="200" placeholder="Ej: en esta transferencia también van $2.000 del kiosco"></textarea>
     <div class="err" id="pErr" hidden></div>
     <div class="actions"><button class="btn soft" data-cerrar>Cancelar</button><button class="btn" id="pEnviar">${I("send")} Enviar</button></div>`,
   (s, cerrar)=>{
@@ -886,6 +888,7 @@ function hojaPago(){
         f = await comprimir(f);
         if(f.size > 10*1024*1024) throw new Error("El archivo pesa más de 10 MB.");
         const fd = new FormData(); fd.append("codigo",S.codigo); fd.append("archivo", f);
+        const obs = s.querySelector("#pObs").value.trim(); if(obs) fd.append("observacion", obs);
         if(ps.length===1){ fd.append("monto", String(ps[0].monto)); fd.append("evento_id", ps[0].f.id===null?"":String(ps[0].f.id)); }
         else { fd.append("monto", String(total())); fd.append("reparto", JSON.stringify(ps.map(x=>({evento_id:x.f.id, monto:x.monto})))); }
         await fnComprobantes(fd);
@@ -914,7 +917,8 @@ function tabInicio(){
     <div class="list" id="tPend">${pend.length ? pend.map(p=>`
       <div class="item" style="flex-wrap:wrap"><div class="avatar sm">${esc(ini(p.miembro))}</div>
         <div class="l"><div class="t">${esc(p.miembro)}</div><div class="muted small">${p.detalle&&p.detalle.length>1?"Una transferencia repartida":esc(p.concepto)} · ${p.fecha}</div>
-          ${p.detalle&&p.detalle.length>1?`<div class="small">${p.detalle.map(x=>`${esc(x.concepto)}: <b>${fmt(x.monto)}</b>`).join(" · ")}</div>`:""}</div>
+          ${p.detalle&&p.detalle.length>1?`<div class="small">${p.detalle.map(x=>`${esc(x.concepto)}: <b>${fmt(x.monto)}</b>`).join(" · ")}</div>`:""}
+          ${p.observacion?`<div class="small" style="margin-top:4px;padding:6px 10px;border-radius:10px;background:#FFF4D6;color:#4A3B12">${I("msg","sm")} ${esc(p.observacion)}</div>`:""}</div>
         <div class="num" style="font-weight:900;font-size:1.1rem">${fmt(p.monto)}</div>
         <div class="actions" style="width:100%">
           ${p.tiene_comprobante?`<button class="btn soft sm" data-ver="${p.id}">${I("file","sm")} Ver</button>`:`<span class="muted small" style="align-self:center">Sin archivo</span>`}
@@ -2194,7 +2198,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611170900";
+const APP_VERSION = "202611252229";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
