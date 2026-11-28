@@ -607,6 +607,7 @@ function pagosHTML(ps, reenviar){
       <div class="l"><div class="t">${esc(p.concepto)}</div>
       <div class="muted small">${p.fecha} · ${p.medio}${p.recibo_nro?` · Recibo ${p.recibo_nro}`:""}</div>
       ${p.pct_aporte>0?`<span class="pill neutral">${I("heart","sm")} ${fmt(p.monto*p.pct_aporte/100)} al aporte</span>`:""}
+      ${reenviar&&p.tiene_comprobante?`<button class="btn ghost sm" data-ver="${p.id}">${I("file","sm")} Ver comprobante</button>`:""}
       ${reenviar&&p.estado==="verificado"?`<button class="btn ghost sm" data-reenviar="${p.id}">${I("mail","sm")} Reenviar recibo por mail</button>`:""}
       ${!reenviar&&p.estado==="verificado"&&p.recibo_nro?`<button class="btn ghost sm" data-mi-recibo="${p.id}">${I("file","sm")} Ver recibo</button>`:""}
       ${!reenviar&&p.estado==="pendiente"?`<div class="muted tiny">${p.medio==="Efectivo"?(p.sin_confirmar?"Avisaste que le diste este efectivo a tu tesorero. Falta que lo confirme.":"Tu tesorero ya lo registró, pero todavía no lo rindió. El recibo te llega cuando lo entregue a tesorería."):"Esperando que tesorería verifique el comprobante."}</div>`:""}
@@ -2261,7 +2262,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611281440";
+const APP_VERSION = "202611281447";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
