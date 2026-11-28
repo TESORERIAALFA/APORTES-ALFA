@@ -195,6 +195,10 @@ table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;whi
 /* Pestañas abajo */
 .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:15}
 .tabs .in{display:flex;max-width:600px;width:100%}
+.est-sel{font-weight:800}
+.est-sel.est-presente{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.est-sel.est-ausente{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.est-sel.est-tarde{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 .seg{display:flex;gap:6px;background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:4px}
 .seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:10px 6px;font-weight:700;color:var(--muted,inherit);display:flex;gap:6px;align-items:center;justify-content:center;cursor:pointer;font-size:.9rem}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
@@ -1648,7 +1652,7 @@ async function abrirListaReunion(rid){
     <div class="estado neutral small" id="lRes">${resumen()}</div>
     <div class="list" id="lLista">${d.dirigentes.map(x=>`<div class="item" style="flex-wrap:wrap"><div class="l"><div class="t">${esc(x.nombre)}</div>
       <div class="muted tiny" data-info="${x.id}">${x.estado==="ausente"?"Sin registro":(x.metodo==="qr"?"QR":"A mano")+(x.hora?" · "+x.hora:"")}</div></div>
-      <select data-m="${x.id}" ${S.reus?.puede_tomar===false?"disabled":""} style="width:auto;min-width:130px;padding:8px">${Object.keys(EST).map(k=>`<option value="${k}" ${x.estado===k?"selected":""}>${EST[k][0]}</option>`).join("")}</select></div>`).join("")}</div>
+      <select data-m="${x.id}" class="est-sel est-${x.estado}" ${S.reus?.puede_tomar===false?"disabled":""} style="width:auto;min-width:130px;padding:8px">${Object.keys(EST).map(k=>`<option value="${k}" ${x.estado===k?"selected":""}>${EST[k][0]}</option>`).join("")}</select></div>`).join("")}</div>
     <div class="actions">${S.reus?.puede_tomar===false?"":`<button class="btn soft" id="lEsc">${I("check")} Volver al escáner</button>`}<button class="btn" data-cerrar>Listo</button></div>`,
   (s, cerrar)=>{
     const le = s.querySelector("#lEsc"); if(le) le.onclick = ()=>{ cerrar(); abrirEscaner(rid); };
@@ -1656,7 +1660,7 @@ async function abrirListaReunion(rid){
       const sel = ev.target.closest("select[data-m]"); if(!sel) return;
       const it = d.dirigentes.find(x=>x.id===Number(sel.dataset.m)), antes = it.estado; sel.disabled = true;
       try{ await rpc("set_asistencia",{p_codigo:S.codigo,p_reunion:rid,p_miembro:it.id,p_estado:sel.value});
-        it.estado = sel.value; s.querySelector(`[data-info="${it.id}"]`).textContent = sel.value==="ausente" ? "Sin registro" : "A mano · ahora";
+        it.estado = sel.value; sel.className = `est-sel est-${sel.value}`; s.querySelector(`[data-info="${it.id}"]`).textContent = sel.value==="ausente" ? "Sin registro" : "A mano · ahora";
         s.querySelector("#lRes").textContent = resumen();
       }catch(e){ sel.value = antes; toast(e.message); }
       sel.disabled = false;
@@ -2257,7 +2261,7 @@ document.addEventListener("visibilitychange", ()=>{
   recargar().catch(()=>render()); scrollTo({top:0});
 });
 // Si el teléfono quedó con una versión vieja guardada, se trae la nueva
-const APP_VERSION = "202611252313";
+const APP_VERSION = "202611281440";
 (async()=>{ try{
   const r = await fetch(location.pathname + "?nv=" + Date.now(), {cache:"no-store"}); const t = await r.text();
   const m = t.match(/const APP_VERSION = "(\d+)"/);
